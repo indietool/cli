@@ -15,10 +15,7 @@ import (
 
 
 
-var (
-	customTLDs        string
-	exploreJsonOutput bool
-)
+var customTLDs string
 
 // exploreCmd represents the explore command
 var exploreCmd = &cobra.Command{
@@ -68,7 +65,7 @@ Examples:
 		// Organize results
 		exploreResult := domains.OrganizeExploreResults(baseDomain, results)
 
-		if exploreJsonOutput {
+		if jsonOutput {
 			output.OutputExploreJSON(exploreResult)
 		} else {
 			output.OutputExploreHuman(exploreResult)
@@ -80,6 +77,5 @@ func init() {
 	domainCmd.AddCommand(exploreCmd)
 
 	exploreCmd.Flags().StringVar(&customTLDs, "tlds", "", "Comma-separated list of TLDs or @filename for file input")
-	exploreCmd.Flags().BoolVar(&exploreJsonOutput, "json", false, "Output results in JSON format")
 }
 

@@ -21,7 +21,32 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("domain called")
+		// Example of using the global config
+		cfg := GetConfig()
+		if cfg == nil {
+			fmt.Println("No configuration available")
+			return
+		}
+
+		if !cfg.Valid() {
+			fmt.Println("No valid configuration loaded - check your config file")
+			return
+		}
+
+		// Show enabled registrars
+		enabledRegistrars := cfg.GetEnabledRegistrars()
+		if len(enabledRegistrars) == 0 {
+			fmt.Println("No registrars are enabled in the configuration")
+		} else {
+			fmt.Printf("Enabled registrars: %v\n", enabledRegistrars)
+		}
+
+		// Show configuration validation status
+		if errors := cfg.ValidateConfig(); len(errors) > 0 {
+			fmt.Printf("Configuration validation issues: %v\n", errors)
+		} else {
+			fmt.Println("Configuration is valid")
+		}
 	},
 }
 

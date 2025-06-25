@@ -15,7 +15,6 @@ import (
 )
 
 
-var jsonOutput bool
 
 // searchCmd represents the search command
 var searchCmd = &cobra.Command{
@@ -60,5 +59,4 @@ Examples:
 func init() {
 	domainCmd.AddCommand(searchCmd)
 	
-	searchCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format")
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"indietool/cli/domains"
 )
@@ -100,4 +101,86 @@ func OutputExploreHuman(result domains.ExploreResult) {
 		}
 		fmt.Println()
 	}
+}
+
+// OutputDomainListJSON outputs domain list results in JSON format
+func OutputDomainListJSON(result *domains.DomainListResult) {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(result); err != nil {
+		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// OutputDomainListHuman outputs domain list results in human-readable format
+func OutputDomainListHuman(result *domains.DomainListResult) {
+	fmt.Printf("Managed Domains Overview\n")
+	fmt.Printf("========================\n\n")
+	
+	// Summary stats
+	fmt.Printf("Summary: %d domains total\n", result.Summary.Total)
+	fmt.Printf("  ✓ Healthy: %d\n", result.Summary.Healthy)
+	fmt.Printf("  ⚠ Warning: %d\n", result.Summary.Warning)
+	fmt.Printf("  🚨 Critical: %d\n", result.Summary.Critical)
+	if result.Summary.Expired > 0 {
+		fmt.Printf("  💀 Expired: %d\n", result.Summary.Expired)
+	}
+	fmt.Printf("Last synced: %s\n\n", result.LastSynced.Format("2006-01-02 15:04:05"))
+	
+	// Domain table
+	for _, domain := range result.Domains {
+		statusIcon := getStatusIcon(domain.Status)
+		daysUntilExpiry := calculateDaysUntilExpiry(domain.ExpiryDate)
+		
+		fmt.Printf("%s %s (%s)\n", statusIcon, domain.Name, domain.Registrar)
+		fmt.Printf("    Expires: %s (%s)\n", 
+			domain.ExpiryDate.Format("2006-01-02"), 
+			formatExpiryCountdown(daysUntilExpiry))
+		fmt.Printf("    Auto-renewal: %s\n", formatBool(domain.AutoRenewal))
+		fmt.Printf("    Nameservers: %s\n", strings.Join(domain.Nameservers, ", "))
+		fmt.Println()
+	}
+}
+
+// getStatusIcon returns an emoji icon for the domain status
+func getStatusIcon(status domains.DomainStatus) string {
+	switch status {
+	case domains.StatusHealthy:
+		return "✓"
+	case domains.StatusWarning:
+		return "⚠"
+	case domains.StatusCritical:
+		return "🚨"
+	case domains.StatusExpired:
+		return "💀"
+	default:
+		return "?"
+	}
+}
+
+// calculateDaysUntilExpiry calculates days until domain expiry
+func calculateDaysUntilExpiry(expiryDate time.Time) int {
+	return int(expiryDate.Sub(time.Now()).Hours() / 24)
+}
+
+// formatExpiryCountdown formats the expiry countdown in human-readable form
+func formatExpiryCountdown(days int) string {
+	if days < 0 {
+		return fmt.Sprintf("%d days ago", -days)
+	} else if days == 0 {
+		return "today"
+	} else if days == 1 {
+		return "tomorrow"
+	} else {
+		return fmt.Sprintf("in %d days", days)
+	}
+}
+
+// formatBool formats a boolean value for display
+func formatBool(value bool) string {
+	if value {
+		return "enabled"
+	}
+	return "disabled"
 }
