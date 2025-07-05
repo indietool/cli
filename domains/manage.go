@@ -52,6 +52,40 @@ type ManagedDomain struct {
 	DNSRecords  []DNSRecord  `json:"dns_records,omitempty"`
 }
 
+// GetStatus calculates and returns the appropriate DomainStatus based on
+// expiry date and auto-renewal settings
+func (d *ManagedDomain) GetStatus() DomainStatus {
+	now := time.Now()
+	daysUntilExpiry := int(d.ExpiryDate.Sub(now).Hours() / 24)
+
+	// Check if domain has expired
+	if daysUntilExpiry < 0 {
+		return StatusExpired
+	}
+
+	// Critical: Less than 7 days to expiry
+	if daysUntilExpiry < 7 {
+		return StatusCritical
+	}
+
+	// Warning: 7-30 days to expiry OR auto-renewal is disabled
+	if daysUntilExpiry <= 30 || !d.AutoRenewal {
+		return StatusWarning
+	}
+
+	// Healthy: More than 30 days to expiry AND auto-renewal is enabled
+	return StatusHealthy
+}
+
+func (d *ManagedDomain) SetStatus() {
+	d.Status = d.GetStatus()
+}
+
+// UpdateStatus updates the Status field with the calculated status
+func (d *ManagedDomain) UpdateStatus() {
+	d.Status = d.GetStatus()
+}
+
 type DomainStatus string
 
 const (

@@ -3,14 +3,15 @@ package providers
 import (
 	"context"
 	"fmt"
-	"strconv"
+	// "strconv"
 
 	"indietool/cli/domains"
 
 	"github.com/cloudflare/cloudflare-go/v4"
 	"github.com/cloudflare/cloudflare-go/v4/option"
 	"github.com/cloudflare/cloudflare-go/v4/registrar"
-	"github.com/labstack/gommon/log"
+	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 // CloudflareConfig holds Cloudflare-specific configuration
@@ -103,7 +104,7 @@ func (c *CloudflareProvider) ListDomains(ctx context.Context) ([]domains.Managed
 		return nil, fmt.Errorf("provider/cloudflare: failed to list domains: %w", err)
 	}
 
-	log.Infof("cf domains: %+v", cfdomains)
+	// log.Infof("cf domains: %+v", cfdomains)
 
 	domainList := make([]domains.ManagedDomain, 0, len(cfdomains.Result))
 	for _, d := range cfdomains.Result {
@@ -116,14 +117,28 @@ func (c *CloudflareProvider) ListDomains(ctx context.Context) ([]domains.Managed
 }
 
 func parseDomain(rd registrar.Domain) domains.ManagedDomain {
-	autorenew, _ := strconv.ParseBool(rd.JSON.ExtraFields["auto-renew"].Raw())
-	name, _ := strconv.Unquote(rd.JSON.ExtraFields["name"].Raw())
+	data := gjson.Parse(rd.JSON.RawJSON())
 
-	return domains.ManagedDomain{
+	autorenew := data.Get("auto_renew").Bool()
+	name := data.Get("name").Str
+	nameservers := []string{}
+	data.Get("name_servers").ForEach(func(key, value gjson.Result) bool {
+		nameservers = append(
+			nameservers,
+			value.String(),
+		)
+		return true
+	})
+
+	dm := domains.ManagedDomain{
 		Name:        name,
 		ExpiryDate:  rd.ExpiresAt,
+		Provider:    "cloudflare",
 		AutoRenewal: autorenew,
+		Nameservers: nameservers,
 	}
+	dm.SetStatus()
+	return dm
 }
 
 // GetDomain retrieves a specific domain from Cloudflare

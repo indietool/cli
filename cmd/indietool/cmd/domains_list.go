@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"indietool/cli/domains"
+	"indietool/cli/indietool"
 	"indietool/cli/output"
 
 	log "github.com/sirupsen/logrus"
@@ -16,6 +18,10 @@ var (
 	listProviderFilter string
 	listExpiringIn     string
 	listStatus         string
+	listWideOutput     bool
+	listNoHeaders      bool
+	listShowSummary    bool
+	listNoColor        bool
 )
 
 var listCmd = &cobra.Command{
@@ -37,65 +43,43 @@ Examples:
 			return
 		}
 
-		// Get enabled providers
-		enabledProviders := registry.GetEnabledProviders()
-		if len(enabledProviders) == 0 {
-			log.Warnf("No providers are enabled. Please configure and enable at least one provider.")
-			return
-		}
-
-		// Convert providers to registrars
-		registrars := make([]domains.Registrar, 0, len(enabledProviders))
-		for _, p := range enabledProviders {
-			registrars = append(registrars, p.AsRegistrar())
-		}
-
+		registrars := indietool.GetProviders[domains.Registrar](registry)
 		domainManager = domains.NewManager(registrars)
 
-		domain_list := []domains.ManagedDomain{}
+		// Collect domains from all registrars
+		domainList := []domains.ManagedDomain{}
 		for _, registrar := range registrars {
 			dlist, err := registrar.ListDomains(context.TODO())
 			if err != nil {
-				log.Fatalf("failed to list domains :%s", err)
+				log.Errorf("Failed to list domains from registrar: %s", err)
+				continue // Continue with other registrars
 			}
-			domain_list = append(
-				domain_list,
-				dlist...,
-			)
+			domainList = append(domainList, dlist...)
 		}
 
-		log.Infof("domains: %+v", domain_list)
+		// TODO: Apply additional filters (expiring-in, status) here
+		// This would be implemented as part of the filtering logic
 
-		// // If a specific provider filter is requested, validate it exists
-		// if listProviderFilter != "" {
-		// 	if _, exists := registry.Get(listProviderFilter); !exists {
-		// 		handleError(fmt.Errorf("provider '%s' is not configured", listProviderFilter))
-		// 		return
-		// 	}
-		// }
-		//
-		// result, err := domains.ListManagedDomains(domains.ListOptions{
-		// 	Provider:   listProviderFilter,
-		// 	ExpiringIn: listExpiringIn,
-		// 	Status:     listStatus,
-		// })
-		// if err != nil {
-		// 	handleError(err)
-		// 	return
-		// }
+		// Determine output format and render table
+		format := domains.GetOutputFormat(jsonOutput, listWideOutput)
+		options := domains.DomainTableOptions(format, listWideOutput, listNoColor, listNoHeaders, os.Stdout)
 
-		// Create a basic result for output
-		result := &domains.DomainListResult{
-			Domains: domain_list,
-			Summary: domains.DomainSummary{
-				Total: len(domain_list),
-			},
-		}
+		// Get appropriate table config (disable colors for tabwriter formats to avoid alignment issues)
+		// For Table/Wide formats, we always disable colors to prevent ANSI codes from breaking column alignment
+		useColors := !listNoColor && (format != output.FormatTable && format != output.FormatWide)
+		tableConfig := domains.GetDomainTableConfig(useColors)
 
-		if jsonOutput {
-			output.OutputDomainListJSON(result)
+		table := output.NewTable(tableConfig, options)
+		table.AddRows(domainList)
+
+		if listShowSummary || (!jsonOutput && format != output.FormatJSON) {
+			if err := table.RenderWithSummary(); err != nil {
+				handleError(fmt.Errorf("failed to render table: %w", err))
+			}
 		} else {
-			output.OutputDomainListHuman(result)
+			if err := table.Render(); err != nil {
+				handleError(fmt.Errorf("failed to render table: %w", err))
+			}
 		}
 	},
 }
@@ -103,9 +87,41 @@ Examples:
 func init() {
 	domainsCmd.AddCommand(listCmd)
 
+	// Filtering flags
 	listCmd.Flags().StringVar(&listProviderFilter, "provider", "", "Filter by provider (cloudflare, namecheap, porkbun, godaddy)")
 	listCmd.Flags().StringVar(&listExpiringIn, "expiring-in", "", "Show domains expiring within timeframe (e.g., 30d, 1w)")
 	listCmd.Flags().StringVar(&listStatus, "status", "", "Filter by status (healthy, warning, critical, expired)")
+
+	// Output format flags
+	listCmd.Flags().BoolVarP(&listWideOutput, "wide", "w", false, "Show additional columns (nameservers, cost, updated)")
+	listCmd.Flags().BoolVar(&listNoHeaders, "no-headers", false, "Don't show column headers")
+	listCmd.Flags().BoolVar(&listShowSummary, "show-summary", true, "Show summary statistics")
+	listCmd.Flags().BoolVar(&listNoColor, "no-color", false, "Disable colored output")
+
+	// These flags are inherited from the global flags defined in root.go:
+	// --json: Output in JSON format
+}
+
+// calculateDomainSummary calculates summary statistics for a list of domains
+func calculateDomainSummary(domainList []domains.ManagedDomain) domains.DomainSummary {
+	summary := domains.DomainSummary{
+		Total: len(domainList),
+	}
+
+	for _, domain := range domainList {
+		switch domain.Status {
+		case domains.StatusHealthy:
+			summary.Healthy++
+		case domains.StatusWarning:
+			summary.Warning++
+		case domains.StatusCritical:
+			summary.Critical++
+		case domains.StatusExpired:
+			summary.Expired++
+		}
+	}
+
+	return summary
 }
 
 // handleError is a placeholder for error handling
