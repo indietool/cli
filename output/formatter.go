@@ -24,10 +24,10 @@ func OutputSearchJSON(results []domains.DomainSearchResult) {
 func OutputSearchHuman(results []domains.DomainSearchResult) {
 	fmt.Printf("Domain Availability Search Results\n")
 	fmt.Printf("==================================\n\n")
-	
+
 	for _, result := range results {
 		fmt.Printf("Domain: %s\n", result.Domain)
-		
+
 		if result.Error != "" {
 			fmt.Printf("  Status: ERROR - %s\n", result.Error)
 		} else {
@@ -36,12 +36,12 @@ func OutputSearchHuman(results []domains.DomainSearchResult) {
 			} else {
 				fmt.Printf("  Status: ✗ NOT AVAILABLE\n")
 			}
-			
+
 			if result.Status != "" {
 				fmt.Printf("  Details: %s\n", result.Status)
 			}
 		}
-		
+
 		fmt.Println()
 	}
 }
@@ -60,7 +60,7 @@ func OutputExploreJSON(result domains.ExploreResult) {
 func OutputExploreHuman(result domains.ExploreResult) {
 	fmt.Printf("Domain Exploration Results for \"%s\"\n", result.BaseDomain)
 	fmt.Printf(strings.Repeat("=", 40+len(result.BaseDomain)) + "\n\n")
-	
+
 	// Summary
 	totalChecked := len(result.Results)
 	fmt.Printf("Summary: %d domains checked\n", totalChecked)
@@ -70,7 +70,7 @@ func OutputExploreHuman(result domains.ExploreResult) {
 		fmt.Printf("  ⚠ Errors: %d\n", len(result.Errors))
 	}
 	fmt.Println()
-	
+
 	// Available domains
 	if len(result.Available) > 0 {
 		fmt.Printf("✓ AVAILABLE DOMAINS:\n")
@@ -79,7 +79,7 @@ func OutputExploreHuman(result domains.ExploreResult) {
 		}
 		fmt.Println()
 	}
-	
+
 	// Taken domains
 	if len(result.Taken) > 0 {
 		fmt.Printf("✗ TAKEN DOMAINS:\n")
@@ -92,7 +92,7 @@ func OutputExploreHuman(result domains.ExploreResult) {
 		}
 		fmt.Println()
 	}
-	
+
 	// Errors
 	if len(result.Errors) > 0 {
 		fmt.Printf("⚠ ERRORS:\n")
@@ -117,7 +117,7 @@ func OutputDomainListJSON(result *domains.DomainListResult) {
 func OutputDomainListHuman(result *domains.DomainListResult) {
 	fmt.Printf("Managed Domains Overview\n")
 	fmt.Printf("========================\n\n")
-	
+
 	// Summary stats
 	fmt.Printf("Summary: %d domains total\n", result.Summary.Total)
 	fmt.Printf("  ✓ Healthy: %d\n", result.Summary.Healthy)
@@ -127,15 +127,15 @@ func OutputDomainListHuman(result *domains.DomainListResult) {
 		fmt.Printf("  💀 Expired: %d\n", result.Summary.Expired)
 	}
 	fmt.Printf("Last synced: %s\n\n", result.LastSynced.Format("2006-01-02 15:04:05"))
-	
+
 	// Domain table
 	for _, domain := range result.Domains {
 		statusIcon := getStatusIcon(domain.Status)
 		daysUntilExpiry := calculateDaysUntilExpiry(domain.ExpiryDate)
-		
-		fmt.Printf("%s %s (%s)\n", statusIcon, domain.Name, domain.Registrar)
-		fmt.Printf("    Expires: %s (%s)\n", 
-			domain.ExpiryDate.Format("2006-01-02"), 
+
+		fmt.Printf("%s %s (%s)\n", statusIcon, domain.Name, domain.Provider)
+		fmt.Printf("    Expires: %s (%s)\n",
+			domain.ExpiryDate.Format("2006-01-02"),
 			formatExpiryCountdown(daysUntilExpiry))
 		fmt.Printf("    Auto-renewal: %s\n", formatBool(domain.AutoRenewal))
 		fmt.Printf("    Nameservers: %s\n", strings.Join(domain.Nameservers, ", "))
@@ -184,3 +184,4 @@ func formatBool(value bool) string {
 	}
 	return "disabled"
 }
+

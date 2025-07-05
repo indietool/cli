@@ -13,13 +13,14 @@ var configAddCmd = &cobra.Command{
 	Short: "Add configuration settings",
 	Long: `Add new configuration settings to your indietool configuration.
 
-Currently supports adding registrar configurations.
+Currently supports adding provider configurations.
 
 Examples:
-  indietool config add registrar cloudflare --api-key KEY --email EMAIL
-  indietool config add registrar porkbun --api-key KEY --api-secret SECRET`,
+  indietool config add provider cloudflare --api-key KEY --email EMAIL
+  indietool config add provider porkbun --api-key KEY --api-secret SECRET`,
 }
 
 func init() {
 	configCmd.AddCommand(configAddCmd)
 }
+

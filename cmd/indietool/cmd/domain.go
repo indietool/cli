@@ -1,6 +1,5 @@
 /*
-Copyright © 2025 
-
+Copyright © 2025
 */
 package cmd
 
@@ -34,11 +33,11 @@ to quickly create a Cobra application.`,
 		}
 
 		// Show enabled registrars
-		enabledRegistrars := cfg.GetEnabledRegistrars()
-		if len(enabledRegistrars) == 0 {
+		enabledProviders := cfg.GetEnabledProviders()
+		if len(enabledProviders) == 0 {
 			fmt.Println("No registrars are enabled in the configuration")
 		} else {
-			fmt.Printf("Enabled registrars: %v\n", enabledRegistrars)
+			fmt.Printf("Enabled registrars: %v\n", enabledProviders)
 		}
 
 		// Show configuration validation status

@@ -1,6 +1,5 @@
 /*
-Copyright © 2025 
-
+Copyright © 2025
 */
 package cmd
 
@@ -12,12 +11,12 @@ import (
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage indietool configuration",
-	Long: `Manage indietool configuration settings including registrar credentials,
+	Long: `Manage indietool configuration settings including provider credentials,
 domain management preferences, and other application settings.
 
 Examples:
-  indietool config add registrar cloudflare --api-key KEY --email EMAIL
-  indietool config add registrar porkbun --api-key KEY --api-secret SECRET`,
+  indietool config add provider cloudflare --api-key KEY --email EMAIL
+  indietool config add provider porkbun --api-key KEY --api-secret SECRET`,
 }
 
 func init() {
