@@ -89,8 +89,8 @@ func (c *Config) ValidateConfig() []string {
 
 	// Validate Namecheap config if present
 	if nc := c.Providers.Namecheap; nc != nil {
-		if nc.APIKey == "" || nc.APISecret == "" || nc.Username == "" {
-			errors = append(errors, "Namecheap: api_key, api_secret, and username are all required")
+		if nc.APIKey == "" || nc.Username == "" {
+			errors = append(errors, "Namecheap: api_key and username are required")
 		}
 	}
 
