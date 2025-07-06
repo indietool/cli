@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 
 	"indietool/cli/domains"
 	"indietool/cli/indietool"
@@ -49,6 +50,7 @@ Examples:
 		// Collect domains from all registrars
 		domainList := []domains.ManagedDomain{}
 		for _, registrar := range registrars {
+			// TODO: Make concurrent
 			dlist, err := registrar.ListDomains(context.TODO())
 			if err != nil {
 				log.Errorf("Failed to list domains from registrar: %s", err)
@@ -56,6 +58,10 @@ Examples:
 			}
 			domainList = append(domainList, dlist...)
 		}
+
+		sort.SliceStable(domainList, func(i, j int) bool {
+			return domainList[i].Name < domainList[j].Name
+		})
 
 		// TODO: Apply additional filters (expiring-in, status) here
 		// This would be implemented as part of the filtering logic
