@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	// log "github.com/sirupsen/logrus"
 )
 
 // debugCmd represents the debug command

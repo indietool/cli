@@ -3,12 +3,11 @@ package providers
 import (
 	"context"
 	"fmt"
+	"indietool/cli/domains"
 	"time"
 
-	"indietool/cli/domains"
-
+	"github.com/charmbracelet/log"
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
-	log "github.com/sirupsen/logrus"
 )
 
 // NamecheapConfig holds Namecheap-specific configuration

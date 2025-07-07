@@ -3,14 +3,12 @@ package providers
 import (
 	"context"
 	"fmt"
-	// "strconv"
-
 	"indietool/cli/domains"
 
+	"github.com/charmbracelet/log"
 	"github.com/cloudflare/cloudflare-go/v4"
 	"github.com/cloudflare/cloudflare-go/v4/option"
 	"github.com/cloudflare/cloudflare-go/v4/registrar"
-	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 

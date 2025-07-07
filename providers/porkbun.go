@@ -3,13 +3,12 @@ package providers
 import (
 	"context"
 	"fmt"
+	"indietool/cli/domains"
 	"strconv"
 	"strings"
 	"time"
 
-	"indietool/cli/domains"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/charmbracelet/log"
 	"github.com/tuzzmaniandevil/porkbun-go"
 )
 
@@ -97,14 +96,14 @@ func (p *PorkbunProvider) AsRegistrar() domains.Registrar {
 // Configure sets up the Porkbun API client with credentials (for backward compatibility)
 func (p *PorkbunProvider) Configure(config PorkbunConfig) error {
 	p.config = config
-	
+
 	if p.config.APIKey != "" && p.config.APISecret != "" {
 		p.client = porkbun.NewClient(&porkbun.Options{
 			ApiKey:       p.config.APIKey,
 			SecretApiKey: p.config.APISecret,
 		})
 	}
-	
+
 	return nil
 }
 
@@ -197,7 +196,7 @@ func (p *PorkbunProvider) GetRenewalInfo(ctx context.Context, name string) (*dom
 	// Extract TLD from domain name
 	// Simple extraction - in production you might want more robust TLD parsing
 	tld := extractTLD(name)
-	
+
 	if pricing, exists := pricingResponse.Pricing[tld]; exists {
 		// Parse renewal price (Porkbun returns prices as strings)
 		// Note: You might need more robust price parsing here

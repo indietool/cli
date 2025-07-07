@@ -1,14 +1,11 @@
-/*
-Copyright © 2025
-*/
 package cmd
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"indietool/cli/providers"
+
+	"github.com/charmbracelet/log"
+	"github.com/spf13/cobra"
 )
 
 var (

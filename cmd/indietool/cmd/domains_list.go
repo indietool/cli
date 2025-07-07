@@ -3,14 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"sort"
-
 	"indietool/cli/domains"
 	"indietool/cli/indietool"
 	"indietool/cli/output"
+	"os"
+	"sort"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 

@@ -1,15 +1,11 @@
-/*
-Copyright © 2025
-*/
 package cmd
 
 import (
+	"indietool/cli/indietool"
 	"os"
 	"path/filepath"
 
-	"indietool/cli/indietool"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
@@ -118,7 +114,7 @@ func initConfig() {
 
 	// Only log success and validate if config is valid
 	if cfg.Valid() {
-		log.Infof("Loaded configuration from: %s", cfg.Path)
+		log.Debugf("Loaded configuration from: %s", cfg.Path)
 
 		// Optional: Validate the configuration
 		if errors := cfg.ValidateConfig(); len(errors) > 0 {
