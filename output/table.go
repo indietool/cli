@@ -229,13 +229,13 @@ func (t *Table) truncateText(text string, maxLen int) string {
 	if len(text) <= maxLen {
 		return text
 	}
-	
+
 	// Remove ANSI color codes for length calculation
 	cleanText := removeANSIColors(text)
 	if len(cleanText) <= maxLen {
 		return text
 	}
-	
+
 	// Truncate and add ellipsis
 	runes := []rune(cleanText)
 	if len(runes) > maxLen {
@@ -304,7 +304,7 @@ func convertToMap(data interface{}) map[string]interface{} {
 	return result
 }
 
-// convertSliceToMaps converts a slice of structs to []map[string]interface{}
+// convertSliceToMaps converts a slice of structs or maps to []map[string]interface{}
 func convertSliceToMaps(data interface{}) []map[string]interface{} {
 	v := reflect.ValueOf(data)
 	if v.Kind() == reflect.Ptr {
@@ -315,9 +315,19 @@ func convertSliceToMaps(data interface{}) []map[string]interface{} {
 		return nil
 	}
 
+	// Check if it's already a slice of map[string]interface{}
+	if maps, ok := data.([]map[string]interface{}); ok {
+		return maps
+	}
+
 	result := make([]map[string]interface{}, 0, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		if rowMap := convertToMap(v.Index(i).Interface()); rowMap != nil {
+	for i := range v.Len() {
+		item := v.Index(i).Interface()
+
+		// If the item is already a map[string]interface{}, use it directly
+		if itemMap, ok := item.(map[string]interface{}); ok {
+			result = append(result, itemMap)
+		} else if rowMap := convertToMap(item); rowMap != nil {
 			result = append(result, rowMap)
 		}
 	}
