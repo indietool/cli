@@ -175,8 +175,8 @@ func initProviderRegistry(cfg *indietool.Config) {
 	}
 
 	if configuredCount > 0 {
-		log.Infof("Configured %d provider(s)", configuredCount)
-		log.Infof("Enabled %d provider(s)", enabledCount)
+		log.Debugf("Configured %d provider(s)", configuredCount)
+		log.Debugf("Enabled %d provider(s)", enabledCount)
 	} else {
 		log.Debugf("No providers configured")
 	}
