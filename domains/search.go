@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/likexian/whois"
+	whoisparser "github.com/likexian/whois-parser"
 	"github.com/openrdap/rdap"
 )
 
@@ -27,10 +29,29 @@ var PopularTLDs = []string{
 	"ninja", "expert", "pro", "biz", "info", "name", "ventures", "solutions", "services", "consulting",
 }
 
-// SearchDomain checks the availability of a single domain using RDAP
+// SearchDomain checks the availability of a single domain using RDAP with WHOIS fallback
 func SearchDomain(domain string) DomainSearchResult {
+	// Try RDAP first
+	result := searchDomainRDAP(domain)
+
+	// If RDAP failed with an error, fallback to WHOIS
+	if result.Error != "" {
+		whoisResult := searchDomainWHOIS(domain)
+		// If WHOIS succeeded, use it; otherwise keep the RDAP error
+		if whoisResult.Error == "" {
+			return whoisResult
+		}
+		// Keep the original RDAP error but note the fallback attempt
+		result.Error = fmt.Sprintf("RDAP failed (%s), WHOIS fallback also failed (%s)", result.Error, whoisResult.Error)
+	}
+
+	return result
+}
+
+// searchDomainRDAP checks domain availability using RDAP
+func searchDomainRDAP(domain string) DomainSearchResult {
 	client := &rdap.Client{}
-	
+
 	resp, err := client.QueryDomain(domain)
 	if err != nil {
 		// Check if this is an ObjectDoesNotExist error (404), which indicates domain is available
@@ -41,18 +62,18 @@ func SearchDomain(domain string) DomainSearchResult {
 				Status:    "available",
 			}
 		}
-		
+
 		return DomainSearchResult{
 			Domain:    domain,
 			Available: false,
 			Error:     err.Error(),
 		}
 	}
-	
+
 	// Check if domain is available based on RDAP response
 	available := false
 	status := "registered"
-	
+
 	if resp.ObjectClassName == "" || len(resp.Status) == 0 {
 		available = true
 		status = "available"
@@ -60,18 +81,18 @@ func SearchDomain(domain string) DomainSearchResult {
 		// Check status values to determine availability
 		for _, s := range resp.Status {
 			if strings.Contains(strings.ToLower(s), "available") ||
-			   strings.Contains(strings.ToLower(s), "unassigned") {
+				strings.Contains(strings.ToLower(s), "unassigned") {
 				available = true
 				status = "available"
 				break
 			}
 		}
-		
+
 		if !available && len(resp.Status) > 0 {
 			status = strings.Join(resp.Status, ", ")
 		}
 	}
-	
+
 	return DomainSearchResult{
 		Domain:    domain,
 		Available: available,
@@ -79,11 +100,115 @@ func SearchDomain(domain string) DomainSearchResult {
 	}
 }
 
+// searchDomainWHOIS checks domain availability using WHOIS as fallback
+func searchDomainWHOIS(domain string) DomainSearchResult {
+	// Query WHOIS data
+	whoisRaw, err := whois.Whois(domain)
+	if err != nil {
+		return DomainSearchResult{
+			Domain:    domain,
+			Available: false,
+			Error:     fmt.Sprintf("whois query failed: %v", err),
+		}
+	}
+
+	// Parse WHOIS response
+	whoisInfo, err := whoisparser.Parse(whoisRaw)
+	if err != nil {
+		// If parsing fails, try basic text analysis
+		return analyzeRawWHOIS(domain, whoisRaw)
+	}
+
+	// Check parsed WHOIS data
+	available := false
+	status := "registered"
+
+	// If no registrar or registrant, likely available
+	if whoisInfo.Registrar == nil && whoisInfo.Registrant == nil {
+		// Double-check with common "not found" patterns
+		lowerRaw := strings.ToLower(whoisRaw)
+		if containsNotFoundPattern(lowerRaw) {
+			available = true
+			status = "available"
+		}
+	} else if whoisInfo.Registrar != nil {
+		// Domain is registered
+		status = fmt.Sprintf("registered via %s", whoisInfo.Registrar.Name)
+		if whoisInfo.Domain != nil && whoisInfo.Domain.ExpirationDate != "" {
+			status += fmt.Sprintf(" (expires: %s)", whoisInfo.Domain.ExpirationDate)
+		}
+	}
+
+	return DomainSearchResult{
+		Domain:    domain,
+		Available: available,
+		Status:    status,
+	}
+}
+
+// analyzeRawWHOIS performs basic text analysis on raw WHOIS data when parsing fails
+func analyzeRawWHOIS(domain, whoisRaw string) DomainSearchResult {
+	lowerRaw := strings.ToLower(whoisRaw)
+
+	// Check for common "not found" patterns
+	if containsNotFoundPattern(lowerRaw) {
+		return DomainSearchResult{
+			Domain:    domain,
+			Available: true,
+			Status:    "available",
+		}
+	}
+
+	// Check for registration indicators
+	if strings.Contains(lowerRaw, "registrar:") ||
+		strings.Contains(lowerRaw, "registrant:") ||
+		strings.Contains(lowerRaw, "creation date:") ||
+		strings.Contains(lowerRaw, "created:") {
+		return DomainSearchResult{
+			Domain:    domain,
+			Available: false,
+			Status:    "registered (via whois)",
+		}
+	}
+
+	// If we can't determine, assume it's registered to be safe
+	return DomainSearchResult{
+		Domain:    domain,
+		Available: false,
+		Status:    "unknown (whois inconclusive)",
+	}
+}
+
+// containsNotFoundPattern checks for common "domain not found" patterns in WHOIS data
+func containsNotFoundPattern(lowerRaw string) bool {
+	notFoundPatterns := []string{
+		"no match",
+		"not found",
+		"no entries found",
+		"no data found",
+		"domain not found",
+		"not registered",
+		"available for registration",
+		"no matching record",
+		"status: free",
+		"status: available",
+		"no such domain",
+	}
+
+	for _, pattern := range notFoundPatterns {
+		if strings.Contains(lowerRaw, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SearchDomainsConcurrent checks multiple domains concurrently
 func SearchDomainsConcurrent(domains []string) []DomainSearchResult {
 	results := make([]DomainSearchResult, len(domains))
 	var wg sync.WaitGroup
-	
+
 	for i, domain := range domains {
 		wg.Add(1)
 		go func(index int, d string) {
@@ -91,7 +216,7 @@ func SearchDomainsConcurrent(domains []string) []DomainSearchResult {
 			results[index] = SearchDomain(d)
 		}(i, domain)
 	}
-	
+
 	wg.Wait()
 	return results
 }
@@ -119,7 +244,7 @@ func ParseTLDs(input string) ([]string, error) {
 		filename := input[1:]
 		return readTLDsFromFile(filename)
 	}
-	
+
 	// Parse comma-separated list
 	tlds := strings.Split(input, ",")
 	result := make([]string, 0, len(tlds))
@@ -131,11 +256,11 @@ func ParseTLDs(input string) ([]string, error) {
 			result = append(result, tld)
 		}
 	}
-	
+
 	if len(result) == 0 {
 		return nil, fmt.Errorf("no valid TLDs found in input")
 	}
-	
+
 	return result, nil
 }
 
@@ -146,7 +271,7 @@ func readTLDsFromFile(filename string) ([]string, error) {
 		return nil, fmt.Errorf("failed to open file %s: %v", filename, err)
 	}
 	defer file.Close()
-	
+
 	var tlds []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -157,14 +282,15 @@ func readTLDsFromFile(filename string) ([]string, error) {
 			tlds = append(tlds, tld)
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading file %s: %v", filename, err)
 	}
-	
+
 	if len(tlds) == 0 {
 		return nil, fmt.Errorf("no valid TLDs found in file %s", filename)
 	}
-	
+
 	return tlds, nil
 }
+
