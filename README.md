@@ -1,16 +1,16 @@
-# indietool CLI
+# indietools CLI
 
-A command-line tool designed specifically for indie builders and small-time developers to streamline domain management and infrastructure tasks. indietool addresses the unique challenges faced by indie hackers who manage multiple apps and services across different providers.
+A powerful command-line tool designed specifically for indie builders and small-time developers to streamline domain management and infrastructure tasks. indietools addresses the unique challenges faced by indie hackers who manage multiple apps and services across different providers.
 
 ## 🎯 Purpose
 
-indietool tackles the infrastructure and operational challenges that indie builders face daily:
+indietools tackles the infrastructure and operational challenges that indie builders face daily:
 
 - **Domain & DNS Management**: Scattered domains across multiple registrars with inconsistent DNS configurations
 - **Multi-cloud Sprawl**: Apps deployed across different providers without unified oversight
 - **Operational Overhead**: Manual processes for domain discovery, availability checking, and resource management
 
-By providing a unified CLI interface, indietool reduces cognitive overhead and automates repetitive tasks, allowing you to focus on building features rather than managing infrastructure.
+By providing a unified CLI interface, indietools reduces cognitive overhead and automates repetitive tasks, allowing you to focus on building features rather than managing infrastructure.
 
 ## 🚀 Features
 
@@ -18,9 +18,13 @@ By providing a unified CLI interface, indietool reduces cognitive overhead and a
 
 - **Domain Availability Search**: Check the registration status of specific domains using RDAP (Registration Data Access Protocol)
 - **Domain Exploration**: Discover available domains across popular TLDs favored by indie hackers
+- **Domain Management**: List and manage domains across multiple registrar providers
+- **Provider Integration**: Support for Cloudflare, Porkbun, Namecheap, and GoDaddy (more coming)
 - **Concurrent Processing**: Fast, parallel domain checking for efficient bulk operations
-- **Multiple Output Formats**: Human-readable tables and JSON output for automation
+- **Multiple Output Formats**: Human-readable tables, JSON, and YAML output for automation
+- **Flexible Display Options**: Compact and wide table views with customizable columns
 - **Custom TLD Lists**: Support for custom TLD specifications via command line or file input
+- **Configuration Management**: Automatic config file creation and provider setup
 
 ### 🚧 Planned Features
 
@@ -28,28 +32,6 @@ By providing a unified CLI interface, indietool reduces cognitive overhead and a
 - **Infrastructure Dashboard**: Unified view of services across cloud providers
 - **Cost Tracking**: Monitor spending across multiple services and platforms
 - **Security Monitoring**: Track SSL certificates, domain expiration, and security compliance
-
-## 📁 Project Structure
-
-```
-├── cmd/
-│   └── indietool/
-│       ├── main.go                 # Application entry point
-│       └── cmd/
-│           ├── root.go             # Root command and configuration
-│           ├── domain.go           # Domain command group
-│           ├── domain_search.go    # Domain availability search
-│           ├── domain_explore.go   # Domain exploration across TLDs
-│           └── dns.go              # DNS management (planned)
-├── domains/
-│   ├── search.go                   # Domain search logic and RDAP integration
-│   └── explore.go                  # Domain exploration and result organization
-├── output/
-│   └── formatter.go                # Output formatting (JSON/human-readable)
-├── go.mod                          # Go module dependencies
-├── go.sum                          # Dependency checksums
-└── indietool                       # Compiled binary
-```
 
 ## 🛠 Installation
 
@@ -62,14 +44,18 @@ By providing a unified CLI interface, indietool reduces cognitive overhead and a
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd indietool/cli
+cd indietools/cli
 
 # Build the binary
-go build -o indietool cmd/indietool/main.go
+go build -o indietools cmd/indietools/main.go
 
 # (Optional) Install globally
-go install cmd/indietool/main.go
+go install cmd/indietools/main.go
 ```
+
+### First Run
+
+On first run, indietools automatically creates a configuration file at `~/.config/indietools.yaml` with sensible defaults. You can immediately start using the tool without manual configuration.
 
 ## 📖 Usage
 
@@ -81,26 +67,28 @@ Check the availability of one or more specific domains:
 
 ```bash
 # Check a single domain
-indietool domain search example.com
+indietools domain search example.com
 
 # Check multiple domains
-indietool domain search example.com google.com mydomain.org
+indietools domain search example.com google.com mydomain.org
+
+# Wide format with additional columns
+indietools domain search example.com --wide
 
 # Output in JSON format
-indietool domain search example.com --json
+indietools domain search example.com --json
+
+# No colors for CI/automation
+indietools domain search example.com --no-color
 ```
 
 **Example Output:**
 ```
-Domain Availability Search Results
-==================================
+DOMAIN           STATUS      TLD
+example.com      Taken       com
+mydomain.org     Available   org
 
-Domain: example.com
-  Status: ✗ NOT AVAILABLE
-  Details: client transfer prohibited
-
-Domain: mydomain.org
-  Status: ✓ AVAILABLE
+2 domains checked: 1 available, 1 taken
 ```
 
 #### Explore Domain Across TLDs
@@ -109,59 +97,114 @@ Discover available variations of a domain name across popular TLDs:
 
 ```bash
 # Explore using default popular TLDs
-indietool domain explore kopitiam
+indietools domain explore buildhub
 
 # Explore using custom TLDs
-indietool domain explore mycompany --tlds com,org,dev,ai,io
+indietools domain explore mycompany --tlds com,org,dev,ai,io
 
 # Load TLDs from a file
-indietool domain explore startup --tlds @tlds.txt
+indietools domain explore startup --tlds @tlds.txt
+
+# Wide format with cost and registrar info
+indietools domain explore webapp --wide
 
 # JSON output for automation
-indietool domain explore webapp --json
+indietools domain explore webapp --json
 ```
 
 **Example Output:**
 ```
-Domain Exploration Results for "kopitiam"
-=========================================
+DOMAIN           STATUS      TLD
+buildhub.app     Available   app
+buildhub.dev     Available   dev
+buildhub.com     Taken       com
+buildhub.org     Taken       org
 
-Summary: 50 domains checked
-  ✓ Available: 23
-  ✗ Taken: 25
-  ⚠ Errors: 2
+50 domains checked: 23 available, 25 taken, 2 errors
+```
 
-✓ AVAILABLE DOMAINS:
-  kopitiam.app
-  kopitiam.dev
-  kopitiam.sh
-  kopitiam.ai
-  ...
+#### Manage Domains
 
-✗ TAKEN DOMAINS:
-  kopitiam.com (client transfer prohibited)
-  kopitiam.org (registered)
-  ...
+List and manage domains across your configured providers:
+
+```bash
+# List all domains from configured providers
+indietools domains list
+
+# Wide format with expiry dates and costs
+indietools domains list --wide
+
+# JSON output
+indietools domains list --json
 ```
 
 ### Configuration
 
-indietool supports configuration via:
+#### Provider Setup
 
-- **Config File**: `~/.indietool.yaml` (default) or specify with `--config`
-- **Environment Variables**: Automatically loaded with `INDIETOOL_` prefix
+Configure domain registrar providers:
+
+```bash
+# Add Cloudflare provider
+indietools config add provider cloudflare \
+  --account-id YOUR_ACCOUNT_ID \
+  --api-token YOUR_TOKEN \
+  --email your@email.com
+
+# Add Porkbun provider
+indietools config add provider porkbun \
+  --api-key YOUR_KEY \
+  --api-secret YOUR_SECRET
+
+# Add Namecheap provider
+indietools config add provider namecheap \
+  --api-key YOUR_KEY \
+  --api-secret YOUR_SECRET \
+  --username YOUR_USERNAME
+
+# Add GoDaddy provider
+indietools config add provider godaddy \
+  --api-key YOUR_KEY \
+  --api-secret YOUR_SECRET
+```
+
+#### Configuration File
+
+indietools supports configuration via:
+
+- **Config File**: `~/.config/indietools.yaml` (auto-created) or specify with `--config`
 - **Command Flags**: Override config and environment settings
+
+**Example Configuration:**
+```yaml
+domains:
+  providers: ["cloudflare", "porkbun"]
+  management:
+    expiry_warning_days: [30, 7, 1]
+
+providers:
+  cloudflare:
+    account_id: your_account_id_here
+    api_token: your_token_here
+    email: you@example.com
+    enabled: true
+  porkbun:
+    api_key: your_key_here
+    api_secret: your_secret_here
+    enabled: true
+```
 
 ## 🔧 Command Reference
 
 ### Global Flags
 
 - `--config`: Specify custom configuration file path
+- `--json`: Output results in JSON format (available on most commands)
 - `--help`: Show help information
 
 ### Domain Commands
 
-#### `indietool domain search [domains...]`
+#### `indietools domain search [domains...]`
 
 Search for specific domain availability.
 
@@ -169,9 +212,12 @@ Search for specific domain availability.
 - `domains...`: One or more domain names to check
 
 **Flags:**
+- `--wide, -w`: Show additional columns (registrar, cost, expiry, error details)
 - `--json`: Output results in JSON format
+- `--no-color`: Disable colored output
+- `--no-headers`: Don't show column headers
 
-#### `indietool domain explore [domain-name]`
+#### `indietools domain explore [domain-name]`
 
 Explore domain availability across multiple TLDs.
 
@@ -180,50 +226,43 @@ Explore domain availability across multiple TLDs.
 
 **Flags:**
 - `--tlds`: Comma-separated TLD list or `@filename` for file input
+- `--wide, -w`: Show additional columns (cost, expiry, error details)
 - `--json`: Output results in JSON format
+- `--no-color`: Disable colored output
+- `--no-headers`: Don't show column headers
 
-**Popular TLDs (Default):**
+#### `indietools domains list`
+
+List domains from configured providers.
+
+**Flags:**
+- `--wide, -w`: Show additional columns (expiry dates, costs, registrar details)
+- `--json`: Output results in JSON format
+- `--no-color`: Disable colored output
+- `--no-headers`: Don't show column headers
+
+#### `indietools config add provider [provider]`
+
+Configure domain registrar providers.
+
+**Available Providers:**
+- `cloudflare`: Cloudflare Registrar
+- `porkbun`: Porkbun
+- `namecheap`: Namecheap
+- `godaddy`: GoDaddy
+
+**Popular TLDs (Default for explore):**
 `com`, `net`, `org`, `dev`, `app`, `io`, `co`, `me`, `ai`, `sh`, `ly`, `gg`, `cc`, `tv`, `fm`, `tech`, `online`, `site`, `xyz`, `lol`, `wtf`, `cool`, `fun`, `live`, `blog`, `life`, `world`, `cloud`, `digital`, `email`, `studio`, `agency`, `design`, `media`, `social`, `team`, `tools`, `works`, `tips`, `guru`, `ninja`, `expert`, `pro`, `biz`, `info`, `name`, `ventures`, `solutions`, `services`, `consulting`
-
-### DNS Commands (Planned)
-
-```bash
-# Planned DNS management commands
-indietool dns list                  # List all DNS records
-indietool dns add                   # Add DNS record
-indietool dns update                # Update DNS record
-indietool dns delete                # Delete DNS record
-```
-
-## 🧰 Dependencies
-
-- **[Cobra](https://github.com/spf13/cobra)**: CLI framework for Go
-- **[Viper](https://github.com/spf13/viper)**: Configuration management
-- **[openrdap/rdap](https://github.com/openrdap/rdap)**: RDAP client for domain queries
-
-## 🤝 Contributing
-
-indietool is designed by indie builders, for indie builders. Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
 
-## 🎯 Roadmap
+## 🐛 Known Issues
 
-- [ ] **DNS Management**: Complete DNS command implementation
-- [ ] **Multi-provider Support**: Integrate with popular DNS providers (Cloudflare, Route53, etc.)
-- [ ] **Infrastructure Monitoring**: Track services across different cloud providers
-- [ ] **Cost Analytics**: Monitor and optimize spending across platforms
-- [ ] **SSL Certificate Management**: Automated certificate lifecycle management
-- [ ] **Deployment Automation**: Streamlined deployment across different providers
-- [ ] **Team Collaboration**: Multi-user support with role-based access
+- Some TLD registries may have rate limits affecting concurrent queries
+- Provider API integration is still in development for some features
+- Wide format columns may not display data for all providers yet
 
 ---
 

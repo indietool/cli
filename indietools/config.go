@@ -1,7 +1,7 @@
-package indietool
+package indietools
 
 import (
-	"indietool/cli/providers"
+	"indietools/cli/providers"
 	"os"
 
 	"github.com/goccy/go-yaml"

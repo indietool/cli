@@ -4,7 +4,7 @@ Copyright © 2025
 */
 package main
 
-import "indietool/cli/cmd/indietool/cmd"
+import "indietools/cli/cmd/indietools/cmd"
 
 func main() {
 	cmd.Execute()

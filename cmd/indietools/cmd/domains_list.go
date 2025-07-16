@@ -3,9 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"indietool/cli/domains"
-	"indietool/cli/indietool"
-	"indietool/cli/output"
+	"indietools/cli/domains"
+	"indietools/cli/indietools"
+	"indietools/cli/output"
 	"os"
 	"sort"
 
@@ -43,7 +43,7 @@ Examples:
 			return
 		}
 
-		registrars := indietool.GetProviders[domains.Registrar](registry)
+		registrars := indietools.GetProviders[domains.Registrar](registry)
 		domainManager = domains.NewManager(registrars)
 
 		// Collect domains from all registrars

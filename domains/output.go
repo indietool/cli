@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"indietool/cli/output"
+	"indietools/cli/output"
 )
 
 // DomainTableConfig defines the table layout for domain resources

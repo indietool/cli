@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"indietool/cli/config"
+	"indietools/cli/config"
 )
 
 // TestConfigIntegration tests the complete config loading flow

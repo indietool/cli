@@ -3,7 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
-	"indietool/cli/domains"
+	"indietools/cli/domains"
 	"strconv"
 	"strings"
 	"time"

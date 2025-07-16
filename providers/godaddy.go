@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"indietool/cli/domains"
+	"indietools/cli/domains"
 )
 
 // GoDaddyConfig holds GoDaddy-specific configuration

@@ -3,7 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
-	"indietool/cli/domains"
+	"indietools/cli/domains"
 	"time"
 
 	"github.com/charmbracelet/log"

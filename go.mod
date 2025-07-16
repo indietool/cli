@@ -1,4 +1,4 @@
-module indietool/cli
+module indietools/cli
 
 go 1.24.3
 
