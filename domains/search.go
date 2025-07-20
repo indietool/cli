@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/likexian/whois"
 	whoisparser "github.com/likexian/whois-parser"
@@ -14,10 +15,14 @@ import (
 
 // DomainSearchResult represents the result of a domain availability search
 type DomainSearchResult struct {
-	Domain    string `json:"domain"`
-	Available bool   `json:"available"`
-	Status    string `json:"status,omitempty"`
-	Error     string `json:"error,omitempty"`
+	Domain       string     `json:"domain"`
+	Available    bool       `json:"available"`
+	Status       string     `json:"status,omitempty"`
+	Error        string     `json:"error,omitempty"`
+	CreationDate *time.Time `json:"creation_date,omitempty"`
+	ExpiryDate   *time.Time `json:"expiry_date,omitempty"`
+	LastUpdated  *time.Time `json:"last_updated,omitempty"`
+	LastChanged  *time.Time `json:"last_changed,omitempty"`
 }
 
 // PopularTLDs contains TLDs favored by indie hackers and small startups
@@ -93,11 +98,35 @@ func searchDomainRDAP(domain string) DomainSearchResult {
 		}
 	}
 
-	return DomainSearchResult{
+	// Extract date information from RDAP response
+	result := DomainSearchResult{
 		Domain:    domain,
 		Available: available,
 		Status:    status,
 	}
+
+	// Parse events for date information
+	if resp.Events != nil {
+		for _, event := range resp.Events {
+			eventDate := parseRDAPDate(event.Date)
+			if eventDate == nil {
+				continue
+			}
+
+			switch strings.ToLower(event.Action) {
+			case "registration":
+				result.CreationDate = eventDate
+			case "expiration":
+				result.ExpiryDate = eventDate
+			case "last updated":
+				result.LastUpdated = eventDate
+			case "last changed":
+				result.LastChanged = eventDate
+			}
+		}
+	}
+
+	return result
 }
 
 // searchDomainWHOIS checks domain availability using WHOIS as fallback
@@ -139,11 +168,32 @@ func searchDomainWHOIS(domain string) DomainSearchResult {
 		}
 	}
 
-	return DomainSearchResult{
+	// Extract date information from WHOIS response
+	result := DomainSearchResult{
 		Domain:    domain,
 		Available: available,
 		Status:    status,
 	}
+
+	if whoisInfo.Domain != nil {
+		if whoisInfo.Domain.CreatedDate != "" {
+			if t := parseWHOISDate(whoisInfo.Domain.CreatedDate); t != nil {
+				result.CreationDate = t
+			}
+		}
+		if whoisInfo.Domain.ExpirationDate != "" {
+			if t := parseWHOISDate(whoisInfo.Domain.ExpirationDate); t != nil {
+				result.ExpiryDate = t
+			}
+		}
+		if whoisInfo.Domain.UpdatedDate != "" {
+			if t := parseWHOISDate(whoisInfo.Domain.UpdatedDate); t != nil {
+				result.LastUpdated = t
+			}
+		}
+	}
+
+	return result
 }
 
 // analyzeRawWHOIS performs basic text analysis on raw WHOIS data when parsing fails
@@ -202,6 +252,54 @@ func containsNotFoundPattern(lowerRaw string) bool {
 	}
 
 	return false
+}
+
+// parseRDAPDate parses RDAP date strings to time.Time
+func parseRDAPDate(dateStr string) *time.Time {
+	if dateStr == "" {
+		return nil
+	}
+
+	// Try parsing common RDAP date formats
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, dateStr); err == nil {
+			return &t
+		}
+	}
+
+	return nil
+}
+
+// parseWHOISDate parses WHOIS date strings to time.Time
+func parseWHOISDate(dateStr string) *time.Time {
+	if dateStr == "" {
+		return nil
+	}
+
+	// Try parsing common WHOIS date formats
+	formats := []string{
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+		"02-Jan-2006",
+		"2-Jan-2006",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, dateStr); err == nil {
+			return &t
+		}
+	}
+
+	return nil
 }
 
 // SearchDomainsConcurrent checks multiple domains concurrently

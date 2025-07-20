@@ -28,6 +28,12 @@ var ExploreTableConfig = output.TableConfig{
 			JSONPath: "tld",
 			Required: true,
 		},
+		{
+			Name:      "EXPIRY",
+			JSONPath:  "expiry_date",
+			Formatter: ExpiryDateFormatter,
+			Required:  true,
+		},
 	},
 
 	WideColumns: []output.Column{
@@ -44,9 +50,21 @@ var ExploreTableConfig = output.TableConfig{
 			WideOnly:  true,
 		},
 		{
-			Name:      "EXPIRY",
-			JSONPath:  "expiry_date",
-			Formatter: ExpiryDateFormatter,
+			Name:      "CREATION",
+			JSONPath:  "creation_date",
+			Formatter: DateFormatter,
+			WideOnly:  true,
+		},
+		{
+			Name:      "LAST_UPDATED",
+			JSONPath:  "last_updated",
+			Formatter: DateFormatter,
+			WideOnly:  true,
+		},
+		{
+			Name:      "LAST_CHANGED",
+			JSONPath:  "last_changed",
+			Formatter: DateFormatter,
 			WideOnly:  true,
 		},
 		{
@@ -156,13 +174,16 @@ func (er *ExploreResult) ConvertToTableRows() []map[string]interface{} {
 		tld := extractTLD(result.Domain)
 
 		row := map[string]interface{}{
-			"domain":      result.Domain,
-			"status":      getExploreStatus(result),
-			"tld":         tld,
-			"registrar":   "",          // Not available in DomainSearchResult
-			"cost":        0.0,         // Not available in DomainSearchResult
-			"expiry_date": time.Time{}, // Not available in DomainSearchResult
-			"error":       result.Error,
+			"domain":        result.Domain,
+			"status":        getExploreStatus(result),
+			"tld":           tld,
+			"registrar":     "",                    // Not available in DomainSearchResult
+			"cost":          0.0,                   // Not available in DomainSearchResult
+			"expiry_date":   result.ExpiryDate,     // Now available from RDAP/WHOIS
+			"creation_date": result.CreationDate,   // Now available from RDAP/WHOIS
+			"last_updated":  result.LastUpdated,    // Now available from RDAP/WHOIS
+			"last_changed":  result.LastChanged,    // Now available from RDAP/WHOIS
+			"error":         result.Error,
 		}
 		rows = append(rows, row)
 	}
@@ -270,6 +291,11 @@ func ExpiryDateFormatter(value interface{}) string {
 	}
 
 	switch v := value.(type) {
+	case *time.Time:
+		if v == nil || v.IsZero() {
+			return "-"
+		}
+		return v.Format("2006-01-02")
 	case time.Time:
 		if v.IsZero() {
 			return "-"
@@ -292,4 +318,5 @@ func ExpiryDateFormatter(value interface{}) string {
 		return str
 	}
 }
+
 
