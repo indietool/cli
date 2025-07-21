@@ -47,7 +47,7 @@ git clone <repository-url>
 cd indietools/cli
 
 # Build the binary
-go build -o indietools cmd/indietools/main.go
+go build -o dist/indietools cmd/indietools/main.go
 
 # (Optional) Install globally
 go install cmd/indietools/main.go
@@ -83,6 +83,7 @@ indietools domain search example.com --no-color
 ```
 
 **Example Output:**
+
 ```
 DOMAIN           STATUS      TLD
 example.com      Taken       com
@@ -113,6 +114,7 @@ indietools domain explore webapp --json
 ```
 
 **Example Output:**
+
 ```
 DOMAIN           STATUS      TLD
 buildhub.app     Available   app
@@ -157,9 +159,10 @@ indietools config add provider porkbun \
   --api-secret YOUR_SECRET
 
 # Add Namecheap provider
+# Optional: use --client-ip to specify your IP address (must be allowlisted on Namecheap).
+            Auto-detected via an external service, https://ipinfo.io, if left as the default value, `auto`
 indietools config add provider namecheap \
   --api-key YOUR_KEY \
-  --api-secret YOUR_SECRET \
   --username YOUR_USERNAME
 
 # Add GoDaddy provider
@@ -176,6 +179,7 @@ indietools supports configuration via:
 - **Command Flags**: Override config and environment settings
 
 **Example Configuration:**
+
 ```yaml
 domains:
   providers: ["cloudflare", "porkbun"]
@@ -209,9 +213,11 @@ providers:
 Search for specific domain availability.
 
 **Arguments:**
+
 - `domains...`: One or more domain names to check
 
 **Flags:**
+
 - `--wide, -w`: Show additional columns (registrar, cost, expiry, error details)
 - `--json`: Output results in JSON format
 - `--no-color`: Disable colored output
@@ -222,9 +228,11 @@ Search for specific domain availability.
 Explore domain availability across multiple TLDs.
 
 **Arguments:**
+
 - `domain-name`: Base domain name (with or without TLD)
 
 **Flags:**
+
 - `--tlds`: Comma-separated TLD list or `@filename` for file input
 - `--wide, -w`: Show additional columns (cost, expiry, error details)
 - `--json`: Output results in JSON format
@@ -236,6 +244,7 @@ Explore domain availability across multiple TLDs.
 List domains from configured providers.
 
 **Flags:**
+
 - `--wide, -w`: Show additional columns (expiry dates, costs, registrar details)
 - `--json`: Output results in JSON format
 - `--no-color`: Disable colored output
@@ -246,6 +255,7 @@ List domains from configured providers.
 Configure domain registrar providers.
 
 **Available Providers:**
+
 - `cloudflare`: Cloudflare Registrar
 - `porkbun`: Porkbun
 - `namecheap`: Namecheap
@@ -268,4 +278,4 @@ This project is licensed under the Apache 2.0 License - see the LICENSE file for
 
 **Built with ❤️ for the indie builder community**
 
-*Reduce infrastructure overhead. Focus on shipping.*
+_Reduce infrastructure overhead. Focus on shipping._
