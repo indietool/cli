@@ -8,6 +8,7 @@ import (
 	"indietools/cli/output"
 	"os"
 	"sort"
+	"sync"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
@@ -48,15 +49,28 @@ Examples:
 
 		// Collect domains from all registrars
 		domainList := []domains.ManagedDomain{}
+		wg := sync.WaitGroup{}
+		domainsMux := sync.Mutex{}
+
 		for _, registrar := range registrars {
-			// TODO: Make concurrent
-			dlist, err := registrar.ListDomains(context.TODO())
-			if err != nil {
-				log.Errorf("Failed to list domains from registrar: %s", err)
-				continue // Continue with other registrars
-			}
-			domainList = append(domainList, dlist...)
+			wg.Add(1)
+
+			go func(reg domains.Registrar) {
+				defer wg.Done()
+
+				dlist, err := reg.ListDomains(context.TODO())
+				if err != nil {
+					log.Errorf("Failed to list domains from registrar: %s", err)
+					return
+				}
+
+				domainsMux.Lock()
+				domainList = append(domainList, dlist...)
+				domainsMux.Unlock()
+			}(registrar)
 		}
+
+		wg.Wait()
 
 		sort.SliceStable(domainList, func(i, j int) bool {
 			return domainList[i].Name < domainList[j].Name

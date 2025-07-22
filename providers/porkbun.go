@@ -6,6 +6,7 @@ import (
 	"indietools/cli/domains"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -119,16 +120,29 @@ func (p *PorkbunProvider) ListDomains(ctx context.Context) ([]domains.ManagedDom
 		return nil, fmt.Errorf("provider/porkbun: failed to list domains: %w", err)
 	}
 
-	// Convert Porkbun domains to our internal domain structure
+	// Convert Porkbun domains to our internal domain structure concurrently
 	domainList := make([]domains.ManagedDomain, 0, len(response.Domains))
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
 	for _, porkbunDomain := range response.Domains {
-		managedDomain, err := p.convertPorkbunDomain(ctx, porkbunDomain)
-		if err != nil {
-			log.Errorf("Failed to convert Porkbun domain %s: %v", porkbunDomain.Domain, err)
-			continue // Skip this domain but continue with others
-		}
-		domainList = append(domainList, managedDomain)
+		wg.Add(1)
+		go func(pbDomain porkbun.Domain) {
+			defer wg.Done()
+
+			managedDomain, err := p.convertPorkbunDomain(ctx, pbDomain)
+			if err != nil {
+				log.Errorf("Failed to convert Porkbun domain %s: %v", pbDomain.Domain, err)
+				return // Skip this domain but continue with others
+			}
+
+			mu.Lock()
+			domainList = append(domainList, managedDomain)
+			mu.Unlock()
+		}(porkbunDomain)
 	}
+
+	wg.Wait()
 
 	return domainList, nil
 }

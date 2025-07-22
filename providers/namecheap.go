@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"indietools/cli/domains"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -130,6 +131,7 @@ func (n *NamecheapProvider) ListDomains(ctx context.Context) ([]domains.ManagedD
 	}
 
 	var allDomains []domains.ManagedDomain
+	var mu sync.Mutex
 	page := 1
 	pageSize := 100 // Maximum allowed by Namecheap API
 
@@ -148,20 +150,30 @@ func (n *NamecheapProvider) ListDomains(ctx context.Context) ([]domains.ManagedD
 			break // No more domains
 		}
 
-		// Convert Namecheap domains to our internal domain structure
+		// Convert Namecheap domains to our internal domain structure concurrently
+		var wg sync.WaitGroup
 		for _, ncDomain := range *response.Domains {
-			managedDomain, err := n.convertNamecheapDomain(ctx, ncDomain)
-			if err != nil {
-				domainName := "unknown"
-				if ncDomain.Name != nil {
-					domainName = *ncDomain.Name
+			wg.Add(1)
+			go func(domain namecheap.Domain) {
+				defer wg.Done()
+
+				managedDomain, err := n.convertNamecheapDomain(ctx, domain)
+				if err != nil {
+					domainName := "unknown"
+					if domain.Name != nil {
+						domainName = *domain.Name
+					}
+					log.Errorf("Failed to convert Namecheap domain %s: %v",
+						domainName, err)
+					return // Skip this domain but continue with others
 				}
-				log.Errorf("Failed to convert Namecheap domain %s: %v",
-					domainName, err)
-				continue // Skip this domain but continue with others
-			}
-			allDomains = append(allDomains, managedDomain)
+
+				mu.Lock()
+				allDomains = append(allDomains, managedDomain)
+				mu.Unlock()
+			}(ncDomain)
 		}
+		wg.Wait()
 
 		// Check if we have more pages
 		if response.Paging == nil || len(*response.Domains) < pageSize {
