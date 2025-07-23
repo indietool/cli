@@ -1,11 +1,10 @@
-package indietools
+package indietool
 
 import (
 	"context"
+	"indietool/cli/domains"
+	"indietool/cli/providers"
 	"reflect"
-
-	"indietools/cli/domains"
-	"indietools/cli/providers"
 )
 
 // Provider defines the interface for service provider integrations

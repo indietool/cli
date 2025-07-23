@@ -2,7 +2,7 @@ package domains
 
 import (
 	"fmt"
-	"indietools/cli/output"
+	"indietool/cli/output"
 	"io"
 	"sort"
 	"strings"
@@ -177,12 +177,12 @@ func (er *ExploreResult) ConvertToTableRows() []map[string]interface{} {
 			"domain":        result.Domain,
 			"status":        getExploreStatus(result),
 			"tld":           tld,
-			"registrar":     "",                    // Not available in DomainSearchResult
-			"cost":          0.0,                   // Not available in DomainSearchResult
-			"expiry_date":   result.ExpiryDate,     // Now available from RDAP/WHOIS
-			"creation_date": result.CreationDate,   // Now available from RDAP/WHOIS
-			"last_updated":  result.LastUpdated,    // Now available from RDAP/WHOIS
-			"last_changed":  result.LastChanged,    // Now available from RDAP/WHOIS
+			"registrar":     "",                  // Not available in DomainSearchResult
+			"cost":          0.0,                 // Not available in DomainSearchResult
+			"expiry_date":   result.ExpiryDate,   // Now available from RDAP/WHOIS
+			"creation_date": result.CreationDate, // Now available from RDAP/WHOIS
+			"last_updated":  result.LastUpdated,  // Now available from RDAP/WHOIS
+			"last_changed":  result.LastChanged,  // Now available from RDAP/WHOIS
 			"error":         result.Error,
 		}
 		rows = append(rows, row)
@@ -318,5 +318,3 @@ func ExpiryDateFormatter(value interface{}) string {
 		return str
 	}
 }
-
-

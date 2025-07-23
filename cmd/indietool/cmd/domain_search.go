@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"indietools/cli/domains"
-	"indietools/cli/output"
+	"indietool/cli/domains"
+	"indietool/cli/output"
 	"os"
 	"strings"
 

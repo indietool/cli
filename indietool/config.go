@@ -1,7 +1,7 @@
-package indietools
+package indietool
 
 import (
-	"indietools/cli/providers"
+	"indietool/cli/providers"
 	"os"
 
 	"github.com/goccy/go-yaml"
@@ -110,7 +110,7 @@ func (c *Config) ValidateConfig() []string {
 // GetEnabledProviders returns a list of provider names that are configured and enabled
 func (c *Config) GetEnabledProviders() []string {
 	var enabled []string
-	
+
 	if c.Providers.Cloudflare != nil && c.Providers.Cloudflare.Enabled {
 		enabled = append(enabled, "cloudflare")
 	}
@@ -123,6 +123,6 @@ func (c *Config) GetEnabledProviders() []string {
 	if c.Providers.GoDaddy != nil && c.Providers.GoDaddy.Enabled {
 		enabled = append(enabled, "godaddy")
 	}
-	
+
 	return enabled
 }

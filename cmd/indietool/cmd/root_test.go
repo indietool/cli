@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"indietool/cli/config"
 	"os"
 	"path/filepath"
 	"testing"
-	"indietools/cli/config"
 )
 
 // TestConfigIntegration tests the complete config loading flow
@@ -216,7 +216,7 @@ func TestSaveConfigIfValid(t *testing.T) {
 
 	// Test with invalid config
 	appConfig = &config.Config{} // No LoadedPath, so invalid
-	saveConfigIfValid() // Should not save anything
+	saveConfigIfValid()          // Should not save anything
 
 	// Test with Viper config (should skip saving)
 	appConfig = &config.Config{LoadedPath: "<viper>"}
@@ -225,7 +225,7 @@ func TestSaveConfigIfValid(t *testing.T) {
 	// Test with valid config and temporary file
 	tempDir := t.TempDir()
 	testConfigPath := filepath.Join(tempDir, "test-save-config.yaml")
-	
+
 	// Create a test config file first
 	testConfigContent := `domains:
   management:
@@ -261,7 +261,7 @@ func TestSaveConfigIfValid(t *testing.T) {
 	if len(actualDays) != len(expectedDays) {
 		t.Errorf("Expected %d expiry warning days, got %d", len(expectedDays), len(actualDays))
 	}
-	
+
 	for i, expected := range expectedDays {
 		if i >= len(actualDays) || actualDays[i] != expected {
 			t.Errorf("Expected expiry warning day %d at index %d, got %d", expected, i, actualDays[i])

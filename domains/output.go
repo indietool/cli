@@ -2,10 +2,9 @@ package domains
 
 import (
 	"fmt"
+	"indietool/cli/output"
 	"io"
 	"strings"
-
-	"indietools/cli/output"
 )
 
 // DomainTableConfig defines the table layout for domain resources

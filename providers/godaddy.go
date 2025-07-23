@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"indietool/cli/domains"
 	"io"
 	"net/http"
 	"time"
-
-	"indietools/cli/domains"
 )
 
 // GoDaddyConfig holds GoDaddy-specific configuration

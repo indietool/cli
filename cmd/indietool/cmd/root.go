@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"indietools/cli/indietools"
+	"indietool/cli/indietool"
 	"os"
 	"path/filepath"
 
@@ -13,13 +13,13 @@ var (
 	configPath        string
 	defaultConfigPath string // Store default config path to detect when using default
 	jsonOutput        bool
-	appConfig         *indietools.Config   // Global config instance
-	providerRegistry  *indietools.Registry // Global provider registry
+	appConfig         *indietool.Config   // Global config instance
+	providerRegistry  *indietool.Registry // Global provider registry
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "indietools",
+	Use:   "indietool",
 	Short: "indie builder toolkit",
 	//	Long: `A longer description that spans multiple lines and likely contains
 	//
@@ -53,7 +53,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("Failed to get home directory: %v", err)
 	}
-	defaultConfigPath = filepath.Join(homeDir, ".config", "indietools.yaml")
+	defaultConfigPath = filepath.Join(homeDir, ".config", "indietool.yaml")
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -70,21 +70,21 @@ func init() {
 // initConfig loads the configuration from the specified config file path.
 func initConfig() {
 	// Load configuration using the new config package
-	cfg, err := indietools.LoadFromPath(configPath)
+	cfg, err := indietool.LoadFromPath(configPath)
 	if err != nil {
 		// Check if we're using the default config path and the file doesn't exist
 		if configPath == defaultConfigPath && os.IsNotExist(err) {
 			log.Infof("No config file found at default location, creating empty config at: %s", defaultConfigPath)
 
 			// Create empty config
-			cfg = &indietools.Config{
-				Domains: indietools.DomainsConfig{
+			cfg = &indietool.Config{
+				Domains: indietool.DomainsConfig{
 					Providers: []string{},
-					Management: indietools.ManagementConfig{
+					Management: indietool.ManagementConfig{
 						ExpiryWarningDays: []int{30, 7, 1}, // Set default values
 					},
 				},
-				Providers: indietools.ProvidersConfig{},
+				Providers: indietool.ProvidersConfig{},
 			}
 
 			// Ensure the config directory exists
@@ -105,7 +105,7 @@ func initConfig() {
 			// For other errors (non-default path, file exists but corrupted, etc.)
 			log.Warnf("Failed to load config from %s: %v", configPath, err)
 			// Create empty config without saving
-			cfg = &indietools.Config{}
+			cfg = &indietool.Config{}
 		}
 	}
 
@@ -129,19 +129,19 @@ func initConfig() {
 	} else {
 		log.Warnf("No valid configuration loaded - using empty config")
 		// Initialize empty registry
-		registry, _ := indietools.NewRegistry(&indietools.Config{})
+		registry, _ := indietool.NewRegistry(&indietool.Config{})
 		providerRegistry = registry
 	}
 }
 
 // initProviderRegistry creates and configures the global provider registry
 // based on the loaded configuration. Only called when config is valid.
-func initProviderRegistry(cfg *indietools.Config) {
-	registry, err := indietools.NewRegistry(cfg)
+func initProviderRegistry(cfg *indietool.Config) {
+	registry, err := indietool.NewRegistry(cfg)
 	if err != nil {
 		log.Warnf("Failed to create provider registry: %v", err)
 		// Create empty registry as fallback
-		registry, _ = indietools.NewRegistry(&indietools.Config{})
+		registry, _ = indietool.NewRegistry(&indietool.Config{})
 	}
 	providerRegistry = registry
 
@@ -184,13 +184,13 @@ func initProviderRegistry(cfg *indietools.Config) {
 
 // GetConfig returns the globally loaded configuration instance.
 // This function should be called from other commands to access the config.
-func GetConfig() *indietools.Config {
+func GetConfig() *indietool.Config {
 	return appConfig
 }
 
 // GetProviderRegistry returns the globally initialized provider registry.
 // This function should be called from other commands to access providers.
-func GetProviderRegistry() *indietools.Registry {
+func GetProviderRegistry() *indietool.Registry {
 	return providerRegistry
 }
 

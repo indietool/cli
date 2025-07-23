@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"indietools/cli/providers"
+	"indietool/cli/providers"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"

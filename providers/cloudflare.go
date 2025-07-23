@@ -3,7 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
-	"indietools/cli/domains"
+	"indietool/cli/domains"
 
 	"github.com/charmbracelet/log"
 	"github.com/cloudflare/cloudflare-go/v4"

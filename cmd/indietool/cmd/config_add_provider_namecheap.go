@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"indietools/cli/providers"
+	"indietool/cli/providers"
 	"io"
 	"net/http"
 	"regexp"
