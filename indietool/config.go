@@ -2,6 +2,7 @@ package indietool
 
 import (
 	"indietool/cli/providers"
+	"indietool/cli/indietool/secrets"
 	"os"
 
 	"github.com/goccy/go-yaml"
@@ -11,6 +12,7 @@ import (
 type Config struct {
 	Domains   DomainsConfig   `yaml:"domains"`
 	Providers ProvidersConfig `yaml:"providers"`
+	Secrets   secrets.Config  `yaml:"secrets"`
 	Path      string          `yaml:"-"` // Path where config was successfully loaded from
 }
 
@@ -125,4 +127,20 @@ func (c *Config) GetEnabledProviders() []string {
 	}
 
 	return enabled
+}
+
+// GetSecretsConfig returns the secrets configuration with defaults
+func (c *Config) GetSecretsConfig() *secrets.Config {
+	// Set defaults if not configured
+	if c.Secrets.DefaultDatabase == "" {
+		c.Secrets.DefaultDatabase = "default"
+	}
+	if c.Secrets.ClipboardTTL == 0 {
+		c.Secrets.ClipboardTTL = 30
+	}
+	if !c.Secrets.OutputMasked {
+		c.Secrets.OutputMasked = true
+	}
+	
+	return &c.Secrets
 }
