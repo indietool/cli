@@ -15,11 +15,11 @@ var (
 	DefaultBaseDir = "~/.config/indietool"
 
 	// Config
-	DefaultConfigFileLocation = "~/.config/indietool/indietool.yaml"
+	DefaultConfigFileLocation = fmt.Sprintf("%s/indietool.yaml", DefaultBaseDir)
 
 	// Secrets
 	DefaultSecretDatabase     = "default"
-	DefaultSecretLocation     = fmt.Sprintf("%s/secrets/%s", DefaultBaseDir, DefaultSecretDatabase)
+	DefaultSecretLocation     = fmt.Sprintf("%s/secrets", DefaultBaseDir)
 	DefaultSecretClipboardTTL = 30 // seconds
 
 )
@@ -202,5 +202,5 @@ func (c *Config) getSecretsDir() string {
 	configDir := filepath.Dir(c.Path)
 
 	// Secrets should be in <config_dir>/secrets/<database>
-	return filepath.Join(configDir, "secrets", DefaultSecretDatabase)
+	return filepath.Join(configDir, "secrets")
 }
