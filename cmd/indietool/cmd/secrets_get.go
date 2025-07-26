@@ -17,7 +17,7 @@ var secretsGetCmd = &cobra.Command{
 }
 
 func init() {
-	secretsGetCmd.Flags().Bool("reveal", false, "Show the actual secret value (WARNING: will be visible in terminal)")
+	secretsGetCmd.Flags().BoolP("show", "s", false, "Show the actual secret value (WARNING: will be visible in terminal)")
 }
 
 func getSecret(cmd *cobra.Command, args []string) error {
@@ -31,7 +31,7 @@ func getSecret(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("secret name cannot be empty")
 	}
 
-	reveal, _ := cmd.Flags().GetBool("reveal")
+	show, _ := cmd.Flags().GetBool("show")
 
 	// Get secrets config
 	secretsConfig := cfg.GetSecretsConfig()
@@ -54,12 +54,12 @@ func getSecret(cmd *cobra.Command, args []string) error {
 
 	// Display secret information
 	fmt.Printf("Name: %s\n", secret.Name)
-	
-	if reveal {
+
+	if show {
 		fmt.Printf("⚠️  WARNING: Secret value will be displayed in plaintext!\n")
 		fmt.Printf("Value: %s\n", secret.Value)
 	} else {
-		fmt.Printf("Value: ***MASKED*** (use --reveal to show)\n")
+		fmt.Printf("Value: ***MASKED*** (use --show to show)\n")
 	}
 
 	if secret.Note != "" {
@@ -79,3 +79,4 @@ func getSecret(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
