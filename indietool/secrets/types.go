@@ -30,7 +30,7 @@ type Config struct {
 	DefaultDatabase string `yaml:"default_database"`
 	StorageDir      string `yaml:"storage_dir"`
 	ClipboardTTL    int    `yaml:"clipboard_ttl_seconds"`
-	OutputMasked    bool   `yaml:"output_masked"`
+	MaskOutput      bool   `yaml:"output_masked"`
 }
 
 // ParseSecretIdentifier parses name[@database] syntax and returns the components
@@ -61,3 +61,4 @@ func (s *Secret) ToListItem() *SecretListItem {
 		Expired:   s.IsExpired(),
 	}
 }
+

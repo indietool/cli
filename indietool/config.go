@@ -138,8 +138,8 @@ func (c *Config) GetSecretsConfig() *secrets.Config {
 	if c.Secrets.ClipboardTTL == 0 {
 		c.Secrets.ClipboardTTL = 30
 	}
-	if !c.Secrets.OutputMasked {
-		c.Secrets.OutputMasked = true
+	if !c.Secrets.MaskOutput {
+		c.Secrets.MaskOutput = true
 	}
 	
 	return &c.Secrets
