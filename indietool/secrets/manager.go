@@ -32,6 +32,11 @@ func NewManager(config *Config) (*Manager, error) {
 	}, nil
 }
 
+// HasDatabaseKey checks if an encryption key already exists for the specified database
+func (m *Manager) HasDatabaseKey(database string) bool {
+	return m.encryptor.HasKey(database)
+}
+
 // InitDatabase initializes encryption for the specified database
 func (m *Manager) InitDatabase(database, keyPath string) error {
 	return m.encryptor.InitializeKey(database, keyPath)

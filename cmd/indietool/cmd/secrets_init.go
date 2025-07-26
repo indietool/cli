@@ -36,6 +36,15 @@ func initSecrets(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create secrets manager: %w", err)
 	}
 
+	// Check if key already exists
+	if manager.HasDatabaseKey(database) {
+		fmt.Printf("⚠️  WARNING: An encryption key already exists for database '%s'\n", database)
+		fmt.Println("   Reinitializing will replace the existing key and make current secrets inaccessible.")
+		fmt.Println("   If you have existing secrets, they will become permanently unreadable.")
+		fmt.Println("   To proceed anyway, first delete the existing key or use a different database name.")
+		return fmt.Errorf("refusing to overwrite existing encryption key")
+	}
+
 	if err := manager.InitDatabase(database, keyPath); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}

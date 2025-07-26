@@ -21,6 +21,13 @@ func NewEncryptor() (*Encryptor, error) {
 	return &Encryptor{}, nil
 }
 
+// HasKey checks if an encryption key already exists for the specified database
+func (e *Encryptor) HasKey(database string) bool {
+	keyName := fmt.Sprintf("db-key-%s", database)
+	_, err := keyring.Get(KeyringService, keyName)
+	return err == nil
+}
+
 // InitializeKey initializes or loads an encryption key for the specified database
 func (e *Encryptor) InitializeKey(database, keyPath string) error {
 	var identity *age.X25519Identity
