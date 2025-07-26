@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"indietool/cli/indietool/secrets"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"indietool/cli/indietool/secrets"
 )
 
 var secretsGetCmd = &cobra.Command{
@@ -79,4 +79,3 @@ func getSecret(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-

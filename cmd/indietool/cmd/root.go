@@ -4,17 +4,33 @@ import (
 	"indietool/cli/indietool"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
+// expandTildePath expands ~ to the user's home directory in a file path
+func expandTildePath(path string) string {
+	if !strings.HasPrefix(path, "~/") {
+		return path
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return path // Return original path if we can't get home dir
+	}
+
+	return filepath.Join(homeDir, path[2:])
+}
+
 var (
-	configPath        string
-	defaultConfigPath string // Store default config path to detect when using default
-	jsonOutput        bool
-	appConfig         *indietool.Config   // Global config instance
-	providerRegistry  *indietool.Registry // Global provider registry
+	// configPath        string
+	// defaultConfigPath string // Store default config path to detect when using default
+	jsonOutput       bool
+	providerRegistry *indietool.Registry // Global provider registry
+
+	appConfig = indietool.GetDefaultConfig() // Get a copy of default config
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -48,64 +64,54 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Get home directory for default config path
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("Failed to get home directory: %v", err)
-	}
-	defaultConfigPath = filepath.Join(homeDir, ".config", "indietool.yaml")
-
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath, "config file path")
+	rootCmd.PersistentFlags().StringVarP(&appConfig.Path, "config", "c", appConfig.Path, "config file path")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // initConfig loads the configuration from the specified config file path.
 func initConfig() {
-	// Load configuration using the new config package
-	cfg, err := indietool.LoadFromPath(configPath)
+	// Expand tilde in the config path before loading
+	expandedConfigPath := expandTildePath(appConfig.Path)
+
+	// Load configuration using the expanded path
+	cfg, err := indietool.LoadFromPath(expandedConfigPath)
 	if err != nil {
+		expandedDefaultPath := expandTildePath(indietool.DefaultConfigFileLocation)
+
 		// Check if we're using the default config path and the file doesn't exist
-		if configPath == defaultConfigPath && os.IsNotExist(err) {
-			log.Infof("No config file found at default location, creating empty config at: %s", defaultConfigPath)
+		if expandedConfigPath == expandedDefaultPath && os.IsNotExist(err) {
+			log.Infof("No config file found at default location, creating default config at: %s", expandedDefaultPath)
 
-			// Create empty config
-			cfg = &indietool.Config{
-				Domains: indietool.DomainsConfig{
-					Providers: []string{},
-					Management: indietool.ManagementConfig{
-						ExpiryWarningDays: []int{30, 7, 1}, // Set default values
-					},
-				},
-				Providers: indietool.ProvidersConfig{},
-			}
+			// Create default config
+			cfg := indietool.GetDefaultConfig()
 
-			// Ensure the config directory exists
-			configDir := filepath.Dir(defaultConfigPath)
+			// Ensure the config directory exists (with all parent directories)
+			configDir := filepath.Dir(expandedDefaultPath)
 			if err := os.MkdirAll(configDir, 0755); err != nil {
 				log.Warnf("Failed to create config directory %s: %v", configDir, err)
 			} else {
-				// Save the empty config to the default location
-				if err := cfg.SaveConfig(defaultConfigPath); err != nil {
-					log.Warnf("Failed to save empty config to %s: %v", defaultConfigPath, err)
+				// Save the default config to the expanded location
+				if err := cfg.SaveConfig(expandedDefaultPath); err != nil {
+					log.Warnf("Failed to save default config to %s: %v", expandedDefaultPath, err)
 				} else {
 					// Set the path so the config becomes "valid"
-					cfg.Path = defaultConfigPath
-					log.Infof("Created empty configuration file at: %s", defaultConfigPath)
+					cfg.Path = expandedDefaultPath
+					log.Infof("Created default configuration file at: %s", expandedDefaultPath)
 				}
 			}
 		} else {
 			// For other errors (non-default path, file exists but corrupted, etc.)
-			log.Warnf("Failed to load config from %s: %v", configPath, err)
-			// Create empty config without saving
-			cfg = &indietool.Config{}
+			log.Warnf("Failed to load config from %s: %v", expandedConfigPath, err)
+			// Create default config without saving
+			cfg = indietool.GetDefaultConfig()
 		}
 	}
 

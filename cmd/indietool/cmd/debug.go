@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"indietool/cli/indietool"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -22,12 +23,12 @@ var debugCmd = &cobra.Command{
 
 		// Configuration source information
 		fmt.Println("Configuration Source:")
-		fmt.Printf("  Config path: %s\n", configPath)
-		fmt.Printf("  Default path: %s\n", defaultConfigPath)
-		fmt.Printf("  Using default: %v\n", configPath == defaultConfigPath)
+		fmt.Printf("  Config path: %s\n", config.Path)
+		fmt.Printf("  Default path: %s\n", indietool.DefaultConfigFileLocation)
+		fmt.Printf("  Using default: %v\n", config.Path == indietool.DefaultConfigFileLocation)
 
 		// Check if default config file exists
-		if _, err := os.Stat(defaultConfigPath); os.IsNotExist(err) {
+		if _, err := os.Stat(indietool.DefaultConfigFileLocation); os.IsNotExist(err) {
 			fmt.Printf("  Default config exists: false\n")
 		} else {
 			fmt.Printf("  Default config exists: true\n")
@@ -113,7 +114,7 @@ var debugCmd = &cobra.Command{
 
 		// Test scenario information
 		fmt.Println("Test Scenarios:")
-		fmt.Printf("  To test empty config creation: rm %s && ./indietool debug\n", defaultConfigPath)
+		fmt.Printf("  To test empty config creation: rm %s && ./indietool debug\n", indietool.DefaultConfigFileLocation)
 		fmt.Printf("  To test custom config: ./indietool --config test-config.yaml debug\n")
 		fmt.Printf("  To test provider addition: ./indietool config add provider cloudflare --api-token test123\n")
 	},

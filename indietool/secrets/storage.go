@@ -148,12 +148,11 @@ func (s *Storage) DeleteDatabase(database string) error {
 
 // GetSecretsDir returns the directory where secrets are stored
 func (c *Config) GetSecretsDir() string {
-	if c.StorageDir != "" {
-		return expandPath(c.StorageDir)
+	if c.StorageDir == "" {
+		return ""
 	}
 
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".local", "share", "indietool", "secrets")
+	return expandPath(c.StorageDir)
 }
 
 // expandPath expands ~ in paths to the user's home directory

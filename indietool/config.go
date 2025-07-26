@@ -1,11 +1,27 @@
 package indietool
 
 import (
-	"indietool/cli/providers"
+	"fmt"
 	"indietool/cli/indietool/secrets"
+	"indietool/cli/providers"
 	"os"
+	"path/filepath"
 
 	"github.com/goccy/go-yaml"
+)
+
+var (
+	// Base config dir
+	DefaultBaseDir = "~/.config/indietool"
+
+	// Config
+	DefaultConfigFileLocation = "~/.config/indietool/indietool.yaml"
+
+	// Secrets
+	DefaultSecretDatabase     = "default"
+	DefaultSecretLocation     = fmt.Sprintf("%s/secrets/%s", DefaultBaseDir, DefaultSecretDatabase)
+	DefaultSecretClipboardTTL = 30 // seconds
+
 )
 
 // Config represents the entire configuration structure for the indietool CLI
@@ -51,6 +67,30 @@ func LoadFromPath(path string) (*Config, error) {
 	cfg.Path = path
 
 	return cfg, nil
+}
+
+func GetDefaultConfig() *Config {
+	cfg := &Config{
+		Path: DefaultConfigFileLocation,
+		Domains: DomainsConfig{
+			Providers: []string{},
+			Management: ManagementConfig{
+				ExpiryWarningDays: []int{30, 7, 1}, // Set default values
+			},
+		},
+		Providers: ProvidersConfig{},
+		Secrets: secrets.Config{
+			DefaultDatabase: DefaultSecretDatabase,
+			StorageDir:      "", // Will be calculated by getSecretsDir()
+			ClipboardTTL:    DefaultSecretClipboardTTL,
+			MaskOutput:      true,
+		},
+	}
+
+	// Set the initial secrets directory based on the default config path
+	cfg.Secrets.StorageDir = cfg.getSecretsDir()
+
+	return cfg
 }
 
 // Valid returns true if the configuration was successfully loaded from a file
@@ -133,14 +173,34 @@ func (c *Config) GetEnabledProviders() []string {
 func (c *Config) GetSecretsConfig() *secrets.Config {
 	// Set defaults if not configured
 	if c.Secrets.DefaultDatabase == "" {
-		c.Secrets.DefaultDatabase = "default"
+		c.Secrets.DefaultDatabase = DefaultSecretDatabase
 	}
+
 	if c.Secrets.ClipboardTTL == 0 {
-		c.Secrets.ClipboardTTL = 30
+		c.Secrets.ClipboardTTL = DefaultSecretClipboardTTL
 	}
 	if !c.Secrets.MaskOutput {
 		c.Secrets.MaskOutput = true
 	}
-	
+
+	// Ensure secrets directory is always relative to config directory
+	if c.Secrets.StorageDir == "" || c.Secrets.StorageDir == DefaultSecretLocation {
+		c.Secrets.StorageDir = c.getSecretsDir()
+	}
+
 	return &c.Secrets
+}
+
+// getSecretsDir calculates the secrets directory relative to the config directory
+func (c *Config) getSecretsDir() string {
+	if c.Path == "" {
+		// No config path set, use default
+		return DefaultSecretLocation
+	}
+
+	// Get the directory containing the config file
+	configDir := filepath.Dir(c.Path)
+
+	// Secrets should be in <config_dir>/secrets/<database>
+	return filepath.Join(configDir, "secrets", DefaultSecretDatabase)
 }

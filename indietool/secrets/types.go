@@ -61,4 +61,3 @@ func (s *Secret) ToListItem() *SecretListItem {
 		Expired:   s.IsExpired(),
 	}
 }
-
