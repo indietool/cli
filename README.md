@@ -1,281 +1,273 @@
-# indietools CLI
+# `indietool`
 
-A powerful command-line tool designed specifically for indie builders and small-time developers to streamline domain management and infrastructure tasks. indietools addresses the unique challenges faced by indie hackers who manage multiple apps and services across different providers.
+Tired of bouncing between registrars, tracking domain renewals in spreadsheets, and copy-pasting secrets into `.env` files?
 
-## 🎯 Purpose
+🎯 `indietool` is a CLI tool for indie builders that helps you
 
-indietools tackles the infrastructure and operational challenges that indie builders face daily:
+- 🌍 Hunt domain names across 50+ TLDs — in seconds
+- 🗓️ Track expiries across registrars like Cloudflare & Porkbun
+- 🔐 Securely store API keys & secrets using your OS keyring
 
-- **Domain & DNS Management**: Scattered domains across multiple registrars with inconsistent DNS configurations
-- **Multi-cloud Sprawl**: Apps deployed across different providers without unified oversight
-- **Operational Overhead**: Manual processes for domain discovery, availability checking, and resource management
+No dashboards. No vendor lock-in. Just you and your terminal.
 
-By providing a unified CLI interface, indietools reduces cognitive overhead and automates repetitive tasks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## 🚀 Features
+## 🚀 Quick Start
 
-### ✅ Currently Available
-
-- **Domain Availability Search**: Check the registration status of specific domains using RDAP (Registration Data Access Protocol)
-- **Domain Exploration**: Discover available domains across popular TLDs favored by indie hackers
-- **Domain Management**: List and manage domains across multiple registrar providers
-- **Provider Integration**: Support for Cloudflare, Porkbun, Namecheap, and GoDaddy (more coming)
-- **Concurrent Processing**: Fast, parallel domain checking for efficient bulk operations
-- **Multiple Output Formats**: Human-readable tables, JSON, and YAML output for automation
-- **Flexible Display Options**: Compact and wide table views with customizable columns
-- **Custom TLD Lists**: Support for custom TLD specifications via command line or file input
-- **Configuration Management**: Automatic config file creation and provider setup
-
-### 🚧 Planned Features
-
-- **DNS Management**: Centralized DNS record management across different providers
-- **Infrastructure Dashboard**: Unified view of services across cloud providers
-- **Cost Tracking**: Monitor spending across multiple services and platforms
-- **Security Monitoring**: Track SSL certificates, domain expiration, and security compliance
-
-## 🛠 Installation
-
-### Prerequisites
-
-- Go 1.24.3 or later
-
-### Build from Source
+### Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd indietools/cli
+# macOS/Linux (recommended)
+curl -sSL https://get.indietool.dev | sh
 
-# Build the binary
-go build -o dist/indietools cmd/indietools/main.go
-
-# (Optional) Install globally
-go install cmd/indietools/main.go
+# Or download manually
+wget https://github.com/indietool/indietool/releases/latest/download/indietool-linux-amd64
 ```
 
-### First Run
-
-On first run, indietools automatically creates a configuration file at `~/.config/indietools.yaml` with sensible defaults. You can immediately start using the tool without manual configuration.
-
-## 📖 Usage
-
-### Domain Commands
-
-#### Search Specific Domains
-
-Check the availability of one or more specific domains:
+### Try it in 30 seconds
 
 ```bash
-# Check a single domain
-indietools domain search example.com
+# Check domain availability
+indietool domain explore myapp
 
-# Check multiple domains
-indietools domain search example.com google.com mydomain.org
+# Initialize encrypted secrets
+indietool secrets init
 
-# Wide format with additional columns
-indietools domain search example.com --wide
-
-# Output in JSON format
-indietools domain search example.com --json
-
-# No colors for CI/automation
-indietools domain search example.com --no-color
+# Save a test API key
+indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
 ```
 
-**Example Output:**
+---
 
-```
-DOMAIN           STATUS      TLD
-example.com      Taken       com
-mydomain.org     Available   org
+## 🔁 Everyday Developer Flows
 
-2 domains checked: 1 available, 1 taken
-```
-
-#### Explore Domain Across TLDs
-
-Discover available variations of a domain name across popular TLDs:
+### Weekend Project Setup
 
 ```bash
-# Explore using default popular TLDs
-indietools domain explore buildhub
+# Check which domains are available
+indietool domain explore myproject --tlds dev,com,ai
 
-# Explore using custom TLDs
-indietools domain explore mycompany --tlds com,org,dev,ai,io
-
-# Load TLDs from a file
-indietools domain explore startup --tlds @tlds.txt
-
-# Wide format with cost and registrar info
-indietools domain explore webapp --wide
-
-# JSON output for automation
-indietools domain explore webapp --json
+# Store your API keys securely
+indietool secret set openai-key "sk-..." --note "OpenAI API key"
+indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
 ```
 
-**Example Output:**
-
-```
-DOMAIN           STATUS      TLD
-buildhub.app     Available   app
-buildhub.dev     Available   dev
-buildhub.com     Taken       com
-buildhub.org     Taken       org
-
-50 domains checked: 23 available, 25 taken, 2 errors
-```
-
-#### Manage Domains
-
-List and manage domains across your configured providers:
+### Production Deployment
 
 ```bash
-# List all domains from configured providers
-indietools domains list
+# Check domain expiry before renewal
+indietool domains list --provider cloudflare
 
-# Wide format with expiry dates and costs
-indietools domains list --wide
-
-# JSON output
-indietools domains list --json
+# Export secrets for deployment
+export OPENAI_KEY=$(indietool secret get openai-key --show --json | jq -r '.value')
 ```
 
-### Configuration
+---
 
-#### Provider Setup
+## 💡 Features
 
-Configure domain registrar providers:
+---
+
+### 🔍 Find Available Domains Instantly
+
+**Problem:** Manually checking domain names is slow and painful.
+**Solution:** `indietool domain explore` checks 50+ TLDs in seconds.
 
 ```bash
-# Add Cloudflare provider
-indietools config add provider cloudflare \
+indietool domain explore awesomeproject
+```
+
+```
+DOMAIN                     STATUS     TLD         EXPIRY
+awesomeproject.ai          Available  ai          -
+awesomeproject.dev         Available  dev         -
+awesomeproject.com         Taken      com         2026-07-06
+...
+50 domains checked: 45 available, 5 taken
+```
+
+Filter by specific TLDs:
+
+```bash
+indietool domain explore awesomeproject --tlds ai,dev,io,sh
+```
+
+Or pass a TLD list from file:
+
+```bash
+indietool domain explore myproject --tlds @tldfile
+```
+
+---
+
+### 🔎 Direct Domain Lookup
+
+Know the exact domain you're targeting?
+
+```bash
+indietool domain search awesomeproject.io
+```
+
+---
+
+### 📊 Track All Your Domains in One Place
+
+**Problem:** Domains expire. You don’t want surprises.
+**Solution:** View all domains across registrars in one simple table.
+
+First, connect your registrar(s):
+
+```bash
+# Cloudflare
+indietool config add provider cloudflare \
   --account-id YOUR_ACCOUNT_ID \
   --api-token YOUR_TOKEN \
   --email your@email.com
 
-# Add Porkbun provider
-indietools config add provider porkbun \
-  --api-key YOUR_KEY \
-  --api-secret YOUR_SECRET
-
-# Add Namecheap provider
-# Optional: use --client-ip to specify your IP address (must be allowlisted on Namecheap).
-            Auto-detected via an external service, https://ipinfo.io, if left as the default value, `auto`
-indietools config add provider namecheap \
-  --api-key YOUR_KEY \
-  --username YOUR_USERNAME
-
-# Add GoDaddy provider
-indietools config add provider godaddy \
+# Porkbun
+indietool config add provider porkbun \
   --api-key YOUR_KEY \
   --api-secret YOUR_SECRET
 ```
 
-#### Configuration File
+Then list your domains:
 
-indietools supports configuration via:
-
-- **Config File**: `~/.config/indietools.yaml` (auto-created) or specify with `--config`
-- **Command Flags**: Override config and environment settings
-
-**Example Configuration:**
-
-```yaml
-domains:
-  providers: ["cloudflare", "porkbun"]
-  management:
-    expiry_warning_days: [30, 7, 1]
-
-providers:
-  cloudflare:
-    account_id: your_account_id_here
-    api_token: your_token_here
-    email: you@example.com
-    enabled: true
-  porkbun:
-    api_key: your_key_here
-    api_secret: your_secret_here
-    enabled: true
+```bash
+indietool domains list
 ```
 
-## 🔧 Command Reference
+```
+DOMAIN              PROVIDER     STATUS    EXPIRY
+myawesomeapp.com    cloudflare   Active    2025-12-15
+sideproject.ai      cloudflare   Active    2025-08-10
+```
 
-### Global Flags
+Need more info?
 
-- `--config`: Specify custom configuration file path
-- `--json`: Output results in JSON format (available on most commands)
-- `--help`: Show help information
+```bash
+indietool domains list --wide
+```
 
-### Domain Commands
-
-#### `indietools domain search [domains...]`
-
-Search for specific domain availability.
-
-**Arguments:**
-
-- `domains...`: One or more domain names to check
-
-**Flags:**
-
-- `--wide, -w`: Show additional columns (registrar, cost, expiry, error details)
-- `--json`: Output results in JSON format
-- `--no-color`: Disable colored output
-- `--no-headers`: Don't show column headers
-
-#### `indietools domain explore [domain-name]`
-
-Explore domain availability across multiple TLDs.
-
-**Arguments:**
-
-- `domain-name`: Base domain name (with or without TLD)
-
-**Flags:**
-
-- `--tlds`: Comma-separated TLD list or `@filename` for file input
-- `--wide, -w`: Show additional columns (cost, expiry, error details)
-- `--json`: Output results in JSON format
-- `--no-color`: Disable colored output
-- `--no-headers`: Don't show column headers
-
-#### `indietools domains list`
-
-List domains from configured providers.
-
-**Flags:**
-
-- `--wide, -w`: Show additional columns (expiry dates, costs, registrar details)
-- `--json`: Output results in JSON format
-- `--no-color`: Disable colored output
-- `--no-headers`: Don't show column headers
-
-#### `indietools config add provider [provider]`
-
-Configure domain registrar providers.
-
-**Available Providers:**
-
-- `cloudflare`: Cloudflare Registrar
-- `porkbun`: Porkbun
-- `namecheap`: Namecheap
-- `godaddy`: GoDaddy
-
-**Popular TLDs (Default for explore):**
-`com`, `net`, `org`, `dev`, `app`, `io`, `co`, `me`, `ai`, `sh`, `ly`, `gg`, `cc`, `tv`, `fm`, `tech`, `online`, `site`, `xyz`, `lol`, `wtf`, `cool`, `fun`, `live`, `blog`, `life`, `world`, `cloud`, `digital`, `email`, `studio`, `agency`, `design`, `media`, `social`, `team`, `tools`, `works`, `tips`, `guru`, `ninja`, `expert`, `pro`, `biz`, `info`, `name`, `ventures`, `solutions`, `services`, `consulting`
-
-## 📝 License
-
-This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
-
-## 🐛 Known Issues
-
-- Some TLD registries may have rate limits affecting concurrent queries
-- Provider API integration is still in development for some features
-- Wide format columns may not display data for all providers yet
+```
+DOMAIN              COST    REGISTRAR
+sideproject.ai      -       Cloudflare
+...
+Total annual cost: $82.24
+```
 
 ---
 
-**Built with ❤️ for the indie builder community**
+### 🔐 Secure Local Secrets Without the Hassle
 
-_Reduce infrastructure overhead. Focus on shipping._
+**Problem:** Secrets are either insecure or annoying to manage.
+**Solution:** `indietool secrets` encrypts secrets using your OS keyring — no cloud, no sync, no complicated setup to manage.
+
+#### How it works
+
+| Component        | Stored At                                | Encrypted |
+| ---------------- | ---------------------------------------- | --------- |
+| Secrets Database | `~/.config/indietool/secrets/`           | ✅        |
+| Encryption Key   | OS Keyring (`Keychain`, `gnome-keyring`) | ✅        |
+
+#### Initialize encryption
+
+```bash
+indietool secrets init
+✓ Encryption key initialized
+```
+
+#### Store a secret
+
+```bash
+indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
+✓ Secret stored successfully
+```
+
+#### Retrieve a secret
+
+```bash
+# Safe output (masked)
+indietool secret get stripe-key
+
+# Show actual value
+indietool secret get stripe-key --show
+```
+
+#### List all secrets
+
+```bash
+indietool secret list
+```
+
+#### Use in environment variable
+
+```bash
+export STRIPE_KEY=$(indietool secret get stripe-key --show --json | jq -r '.value')
+```
+
+---
+
+## 🧠 FAQ
+
+### ❓ Where are my secrets stored?
+
+Encrypted locally at `~/.config/indietool/secrets/`, using an encryption key stored in your OS keyring.
+
+---
+
+### ❓ What if I lose my computer?
+
+Secrets are useless without your OS user account + keyring. Just run `indietool secrets init` on your new machine.
+
+---
+
+### ❓ Which registrars are supported?
+
+Currently:
+
+- ✅ Cloudflare
+- ✅ Porkbun
+  More coming soon (Namecheap, Google Domains, etc.)
+
+---
+
+### ❓ Does it work on Windows?
+
+Not yet — currently macOS and Linux only. Windows support is planned.
+
+---
+
+## 🧯 Troubleshooting
+
+### Secrets aren't saving?
+
+- Run `indietool secrets init` again
+- Ensure your keyring (Keychain or gnome-keyring) is unlocked
+
+### "Permission denied" on init?
+
+- Check file permissions on `~/.config/indietool`
+- Try running with elevated permissions once: `sudo indietool secrets init`
+
+### API key errors with registrars?
+
+- Double check key/secret pair
+- Some registrars require IP allowlisting or scopes
+
+---
+
+## 🚫 Limitations
+
+- ❌ No Windows support (yet)
+- 🧩 Only supports a few registrars (Cloudflare, Porkbun)
+- 💻 CLI only — no web UI or GUI planned
+- 🔄 Secrets not synced across machines (by design)
+
+---
+
+## ❤️ Built for indie builders who just want to ship
+
+Stop wasting time in control panels and spreadsheets.
+Let `indietool` handle the busywork — so you can focus on building.
+
+[Get Started →](https://indietool.dev)
