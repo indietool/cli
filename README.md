@@ -18,10 +18,7 @@ No dashboards. No vendor lock-in. Just you and your terminal.
 
 ```bash
 # macOS/Linux (recommended)
-curl -sSL https://get.indietool.dev | sh
-
-# Or download manually
-wget https://github.com/indietool/indietool/releases/latest/download/indietool-linux-amd64
+go install github.com/indietool/cli@latest
 ```
 
 ### Try it in 30 seconds
@@ -30,10 +27,7 @@ wget https://github.com/indietool/indietool/releases/latest/download/indietool-l
 # Check domain availability
 indietool domain explore myapp
 
-# Initialize encrypted secrets
-indietool secrets init
-
-# Save a test API key
+# Save a test API key (auto-creates encryption key)
 indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
 ```
 
@@ -47,9 +41,12 @@ indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
 # Check which domains are available
 indietool domain explore myproject --tlds dev,com,ai
 
-# Store your API keys securely
+# Store your API keys securely (auto-creates encryption key)
 indietool secret set openai-key "sk-..." --note "OpenAI API key"
 indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
+
+# Organize secrets by project using custom databases
+indietool secret set api-key@myproject "key123" --note "Project-specific key"
 ```
 
 ### Production Deployment
@@ -137,9 +134,9 @@ indietool domains list
 ```
 
 ```
-DOMAIN              PROVIDER     STATUS    EXPIRY
-myawesomeapp.com    cloudflare   Active    2025-12-15
-sideproject.ai      cloudflare   Active    2025-08-10
+NAME                PROVIDER    STATUS   EXPIRES  AUTO-RENEW  AGE
+myawesomeapp.com    cloudflare  healthy  8mo      Yes         2y
+sideproject.ai      cloudflare  healthy  1y       Yes         1y
 ```
 
 Need more info?
@@ -149,10 +146,9 @@ indietool domains list --wide
 ```
 
 ```
-DOMAIN              COST    REGISTRAR
-sideproject.ai      -       Cloudflare
-...
-Total annual cost: $82.24
+NAME                PROVIDER    STATUS   EXPIRES  AUTO-RENEW  AGE   NAMESERVERS                          COST  UPDATED
+myawesomeapp.com    cloudflare  healthy  8mo      Yes         2y    fred.ns.cloudflare.com,pam.ns.cl...  N/A   2y
+sideproject.ai      cloudflare  healthy  1y       Yes         1y    fred.ns.cloudflare.com,pam.ns.cl...  N/A   1y
 ```
 
 ---
@@ -169,18 +165,28 @@ Total annual cost: $82.24
 | Secrets Database | `~/.config/indietool/secrets/`           | ✅        |
 | Encryption Key   | OS Keyring (`Keychain`, `gnome-keyring`) | ✅        |
 
-#### Initialize encryption
+#### Store a secret (auto-initializes encryption)
 
-```bash
-indietool secrets init
-✓ Encryption key initialized
-```
-
-#### Store a secret
+**No setup required!** The first time you store a secret, `indietool` automatically creates an encryption key.
 
 ```bash
 indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
-✓ Secret stored successfully
+✓ Auto-generated encryption key for database 'default'
+✓ Secret 'stripe-key' stored successfully
+```
+
+#### Organize secrets with custom databases
+
+Use the `key@database` format to organize secrets by project or environment:
+
+```bash
+# Store in custom databases
+indietool secret set api-key@production "prod_key_123"
+indietool secret set api-key@staging "staging_key_456"
+indietool secret set db-password@myproject "secret123"
+
+# Retrieve from specific database
+indietool secret get api-key@production --show
 ```
 
 #### Retrieve a secret
@@ -197,6 +203,32 @@ indietool secret get stripe-key --show
 
 ```bash
 indietool secret list
+```
+
+#### Manage databases
+
+List all your secret databases:
+
+```bash
+indietool secrets db list
+```
+
+```
+Available secrets databases:
+  default (default)
+  production
+  staging
+  myproject
+```
+
+Delete a database and all its secrets:
+
+```bash
+# Interactive confirmation
+indietool secrets db delete staging
+
+# Force delete without confirmation
+indietool secrets db delete staging --force
 ```
 
 #### Use in environment variable
@@ -217,7 +249,7 @@ Encrypted locally at `~/.config/indietool/secrets/`, using an encryption key sto
 
 ### ❓ What if I lose my computer?
 
-Secrets are useless without your OS user account + keyring. Just run `indietool secrets init` on your new machine.
+Secrets are useless without your OS user account + keyring. Just start storing secrets on your new machine - no manual initialization needed.
 
 ---
 
@@ -227,7 +259,9 @@ Currently:
 
 - ✅ Cloudflare
 - ✅ Porkbun
-  More coming soon (Namecheap, Google Domains, etc.)
+- ✅ Namecheap
+- ✅ Godaddy
+  More coming soon!
 
 ---
 
@@ -241,13 +275,13 @@ Not yet — currently macOS and Linux only. Windows support is planned.
 
 ### Secrets aren't saving?
 
-- Run `indietool secrets init` again
 - Ensure your keyring (Keychain or gnome-keyring) is unlocked
+- Check file permissions on `~/.config/indietool/secrets/`
 
-### "Permission denied" on init?
+### "Permission denied" errors?
 
 - Check file permissions on `~/.config/indietool`
-- Try running with elevated permissions once: `sudo indietool secrets init`
+- Ensure your user has write access to the config directory
 
 ### API key errors with registrars?
 
@@ -259,7 +293,7 @@ Not yet — currently macOS and Linux only. Windows support is planned.
 ## 🚫 Limitations
 
 - ❌ No Windows support (yet)
-- 🧩 Only supports a few registrars (Cloudflare, Porkbun)
+- 🧩 Only supports a few registrars (Cloudflare, Porkbun, Namecheap, Godaddy)
 - 💻 CLI only — no web UI or GUI planned
 - 🔄 Secrets not synced across machines (by design)
 
