@@ -19,4 +19,5 @@ func init() {
 	secretsCmd.AddCommand(secretsSetCmd)
 	secretsCmd.AddCommand(secretsGetCmd)
 	secretsCmd.AddCommand(secretsListCmd)
+	secretsCmd.AddCommand(secretsDbCmd)
 }

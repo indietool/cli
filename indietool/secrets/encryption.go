@@ -67,7 +67,7 @@ func (e *Encryptor) getIdentity(database string) (*age.X25519Identity, error) {
 	keyName := fmt.Sprintf("db-key-%s", database)
 	keyData, err := keyring.Get(KeyringService, keyName)
 	if err != nil {
-		return nil, fmt.Errorf("encryption key not found for database '%s': run 'indietool secrets init' first", database)
+		return nil, fmt.Errorf("encryption key not found for database '%s'", database)
 	}
 
 	identity, err := age.ParseX25519Identity(keyData)

@@ -10,9 +10,9 @@ import (
 )
 
 var secretsSetCmd = &cobra.Command{
-	Use:   "set <name> <value>",
+	Use:   "set <name[@database]> <value>",
 	Short: "Store an encrypted secret",
-	Long:  "Store an encrypted secret with an optional note. The secret will be encrypted and stored securely.",
+	Long:  "Store an encrypted secret with an optional note. The secret will be encrypted and stored securely. Use name@database to specify a custom database.",
 	Args:  cobra.ExactArgs(2),
 	RunE:  setSecret,
 }
@@ -28,12 +28,15 @@ func setSecret(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no configuration available")
 	}
 
-	name := strings.TrimSpace(args[0])
+	identifier := strings.TrimSpace(args[0])
 	value := args[1] // Don't trim value as it might contain intentional whitespace
 
-	if name == "" {
+	if identifier == "" {
 		return fmt.Errorf("secret name cannot be empty")
 	}
+
+	// Parse name@database format
+	name, database := secrets.ParseSecretIdentifier(identifier)
 
 	// Get flags
 	note, _ := cmd.Flags().GetString("note")
@@ -50,7 +53,11 @@ func setSecret(cmd *cobra.Command, args []string) error {
 
 	// Get secrets config
 	secretsConfig := cfg.GetSecretsConfig()
-	database := secretsConfig.GetDefaultDatabase()
+
+	// Use parsed database or fall back to default
+	if database == "" {
+		database = secretsConfig.GetDefaultDatabase()
+	}
 
 	manager, err := secrets.NewManager(secretsConfig)
 	if err != nil {

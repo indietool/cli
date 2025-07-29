@@ -9,9 +9,9 @@ import (
 )
 
 var secretsGetCmd = &cobra.Command{
-	Use:   "get <name>",
+	Use:   "get <name[@database]>",
 	Short: "Retrieve a secret value",
-	Long:  "Retrieve and display a secret value. By default, the value is masked for security.",
+	Long:  "Retrieve and display a secret value. By default, the value is masked for security. Use name@database to specify a custom database.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  getSecret,
 }
@@ -26,16 +26,23 @@ func getSecret(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no configuration available")
 	}
 
-	name := strings.TrimSpace(args[0])
-	if name == "" {
+	identifier := strings.TrimSpace(args[0])
+	if identifier == "" {
 		return fmt.Errorf("secret name cannot be empty")
 	}
+
+	// Parse name@database format
+	name, database := secrets.ParseSecretIdentifier(identifier)
 
 	show, _ := cmd.Flags().GetBool("show")
 
 	// Get secrets config
 	secretsConfig := cfg.GetSecretsConfig()
-	database := secretsConfig.GetDefaultDatabase()
+
+	// Use parsed database or fall back to default
+	if database == "" {
+		database = secretsConfig.GetDefaultDatabase()
+	}
 
 	manager, err := secrets.NewManager(secretsConfig)
 	if err != nil {

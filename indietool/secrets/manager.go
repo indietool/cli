@@ -42,10 +42,27 @@ func (m *Manager) InitDatabase(database, keyPath string) error {
 	return m.encryptor.InitializeKey(database, keyPath)
 }
 
+// ensureDatabaseKey ensures that an encryption key exists for the database,
+// creating one if it doesn't exist
+func (m *Manager) ensureDatabaseKey(database string) error {
+	if !m.HasDatabaseKey(database) {
+		if err := m.InitDatabase(database, ""); err != nil {
+			return fmt.Errorf("failed to auto-initialize database key: %w", err)
+		}
+		fmt.Printf("✓ Auto-generated encryption key for database '%s'\n", database)
+	}
+	return nil
+}
+
 // SetSecret stores an encrypted secret
 func (m *Manager) SetSecret(name, value, database, note string, expiresAt *time.Time) error {
 	if database == "" {
 		database = m.config.GetDefaultDatabase()
+	}
+
+	// Ensure encryption key exists for the database
+	if err := m.ensureDatabaseKey(database); err != nil {
+		return err
 	}
 
 	// Check if secret already exists to preserve creation time
