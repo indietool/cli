@@ -271,12 +271,16 @@ func convertToMap(data interface{}) map[string]interface{} {
 		v = v.Elem()
 	}
 
+	if dataMap, ok := data.(map[string]interface{}); ok {
+		return dataMap
+	}
+
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
 
 	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
+	for i := range v.NumField() {
 		field := t.Field(i)
 		fieldValue := v.Field(i)
 
