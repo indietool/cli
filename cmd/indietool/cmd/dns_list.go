@@ -105,6 +105,10 @@ func outputDNSRecordsTable(records []dns.Record, domain string) {
 		Writer:    os.Stdout,
 	}
 
+	if dnsListWideOutput {
+		options.Format = output.FormatWide
+	}
+
 	config := output.TableConfig{
 		DefaultColumns: []output.Column{
 			{Name: "TYPE", JSONPath: "type", Width: 10},
@@ -113,9 +117,6 @@ func outputDNSRecordsTable(records []dns.Record, domain string) {
 		},
 
 		WideColumns: []output.Column{
-			{Name: "TYPE", JSONPath: "type", Width: 10},
-			{Name: "NAME", JSONPath: "name"},
-			{Name: "CONTENT", JSONPath: "content"},
 			{Name: "TTL", JSONPath: "ttl"},
 			{Name: "PRIORITY", JSONPath: "priority"},
 			{Name: "ID", JSONPath: "id"},
