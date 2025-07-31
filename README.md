@@ -6,6 +6,7 @@ Tired of bouncing between registrars, tracking domain renewals in spreadsheets, 
 
 - 🌍 Hunt domain names across 50+ TLDs — in seconds
 - 🗓️ Track expiries across registrars like Cloudflare & Porkbun
+- ☁️ Manage DNS records across providers with auto-detection
 - 🔐 Securely store API keys & secrets using your OS keyring
 
 No dashboards. No vendor lock-in. Just you and your terminal.
@@ -29,6 +30,9 @@ indietool domain explore myapp
 
 # Save a test API key (auto-creates encryption key)
 indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
+
+# Manage DNS records with automatic provider detection
+indietool dns list example.com
 ```
 
 ---
@@ -40,6 +44,11 @@ indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
 ```bash
 # Check which domains are available
 indietool domain explore myproject --tlds dev,com,ai
+
+# Set up DNS records for your new domain
+indietool dns set myproject.dev @ A 192.168.1.100
+indietool dns set myproject.dev www CNAME myproject.dev
+indietool dns set myproject.dev api A 192.168.1.101
 
 # Store your API keys securely (auto-creates encryption key)
 indietool secret set openai-key "sk-..." --note "OpenAI API key"
@@ -54,6 +63,16 @@ indietool secret set api-key@myproject "key123" --note "Project-specific key"
 ```bash
 # Check domain expiry before renewal
 indietool domains list --provider cloudflare
+
+# Verify DNS configuration before going live
+indietool dns list myproject.com --wide
+
+# Clean up old DNS records
+indietool dns delete myproject.com old-api A
+
+# Update production DNS records
+indietool dns set myproject.com @ A 203.0.113.10
+indietool dns set myproject.com www CNAME myproject.com
 
 # Export secrets for deployment
 export OPENAI_KEY=$(indietool secret get openai-key --show --json | jq -r '.value')
@@ -153,6 +172,102 @@ sideproject.ai      cloudflare  healthy  1y       Yes         1y    fred.ns.clou
 
 ---
 
+### ☁️ Manage DNS Records Across Providers
+
+**Problem:** Managing DNS records across different providers is tedious and error-prone.
+**Solution:** `indietool dns` automatically detects your DNS provider and lets you list and update records from the command line.
+
+#### List DNS records
+
+```bash
+# Auto-detect provider and list records
+indietool dns list example.com
+```
+
+```
+TYPE  NAME     CONTENT
+A     ☁️@      192.168.1.1
+A     www      192.168.1.2
+CNAME ☁️api    example.com
+MX    @        10 mail.example.com
+```
+
+_Note: ☁️ indicates Cloudflare proxied records, available only with the Cloudflare provider, for domains hosted on Cloudflare_
+
+#### Get detailed view
+
+```bash
+indietool dns list example.com --wide
+```
+
+```
+TYPE  NAME     CONTENT          TTL   PRIORITY  ID
+A     ☁️@      192.168.1.1      300             abc123
+A     www      192.168.1.2      300             def456
+CNAME ☁️api    example.com      300             ghi789
+MX    @        mail.example.com 300   10        jkl012
+```
+
+#### Set DNS records
+
+```bash
+# Add an A record
+indietool dns set example.com www A 192.168.1.100
+
+# Add MX record with priority
+indietool dns set example.com @ MX "10 mail.example.com" --priority 10
+
+# Add TXT record for domain verification
+indietool dns set example.com @ TXT "v=spf1 include:_spf.google.com ~all"
+```
+
+#### Delete DNS records
+
+```bash
+# Delete specific record by name and type
+indietool dns delete example.com www A
+
+# Delete all records for a name (with confirmation)
+indietool dns delete example.com api
+
+# Delete specific record by ID (when multiple records have same name)
+indietool dns delete example.com test --id abc123
+
+# Delete without confirmation
+indietool dns delete example.com www A --force
+
+# Delete root domain record
+indietool dns delete example.com @ MX
+
+# Combine filters for precision
+indietool dns delete example.com api --type CNAME --id def456
+```
+
+#### Specify provider explicitly
+
+```bash
+# Use specific provider instead of auto-detection
+indietool dns list example.com --provider cloudflare
+indietool dns set example.com api A 192.168.1.50 --provider porkbun
+indietool dns delete example.com old-record A --provider namecheap
+```
+
+#### Supported DNS providers
+
+- ✅ **Cloudflare** - Full CRUD operations with proxy status indicators
+- ✅ **Porkbun** - Complete DNS record management (list, set, delete)
+- ✅ **Namecheap** - Full CRUD support with batch operations
+
+#### Auto-detection
+
+`indietool` automatically detects your DNS provider by checking nameservers:
+
+- No need to specify `--provider` in most cases
+- Seamlessly works across different providers
+- Falls back to manual provider selection if needed
+
+---
+
 ### 🔐 Secure Local Secrets Without the Hassle
 
 **Problem:** Secrets are either insecure or annoying to manage.
@@ -241,6 +356,30 @@ export STRIPE_KEY=$(indietool secret get stripe-key --show --json | jq -r '.valu
 
 ## 🧠 FAQ
 
+### ❓ Which providers are supported?
+
+| Provider   | Domains | DNS | Secrets |
+| ---------- | ------- | --- | ------- |
+| Cloudflare | ✅      | ✅  | ❌      |
+| Porkbun    | ✅      | ✅  | ❌      |
+| Namecheap  | ✅      | ✅  | ❌      |
+| GoDaddy    | ✅      | ❌  | ❌      |
+| Local      | ❌      | ❌  | ✅      |
+
+**Legend:**
+
+- ✅ Full support
+- 🚧 In development
+- ❌ Not supported
+
+**Notes:**
+
+- **Domains**: Domain registration management, expiry tracking, nameserver updates
+- **DNS**: DNS record management (list, create, update, delete) with ID-based targeting
+- **Secrets**: Local encrypted secret storage using OS keyring
+
+---
+
 ### ❓ Where are my secrets stored?
 
 Encrypted locally at `~/.config/indietool/secrets/`, using an encryption key stored in your OS keyring.
@@ -250,18 +389,6 @@ Encrypted locally at `~/.config/indietool/secrets/`, using an encryption key sto
 ### ❓ What if I lose my computer?
 
 Secrets are useless without your OS user account + keyring. Just start storing secrets on your new machine - no manual initialization needed.
-
----
-
-### ❓ Which registrars are supported?
-
-Currently:
-
-- ✅ Cloudflare
-- ✅ Porkbun
-- ✅ Namecheap
-- ✅ Godaddy
-  More coming soon!
 
 ---
 
@@ -294,6 +421,7 @@ Not yet — currently macOS and Linux only. Windows support is planned.
 
 - ❌ No Windows support (yet)
 - 🧩 Only supports a few registrars (Cloudflare, Porkbun, Namecheap, Godaddy)
+- ☁️ DNS management: GoDaddy implementation in progress
 - 💻 CLI only — no web UI or GUI planned
 - 🔄 Secrets not synced across machines (by design)
 
