@@ -1,28 +1,24 @@
 /*
-Copyright © 2025 
-
+Copyright © 2025
 */
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
 // dnsCmd represents the dns command
 var dnsCmd = &cobra.Command{
 	Use:   "dns",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Manage DNS records for your domains",
+	Long: `Manage DNS records for your domains across different DNS providers.
+Supports listing, setting, and deleting DNS records with automatic provider detection.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("dns called")
-	},
+Examples:
+  indietool dns list example.com
+  indietool dns set example.com www A 192.168.1.1
+  indietool dns delete example.com www A
+  indietool dns set example.com @ MX "10 mail.example.com" --priority 10`,
 }
 
 func init() {
