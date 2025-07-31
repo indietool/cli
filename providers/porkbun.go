@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"indietool/cli/dns"
 	"indietool/cli/domains"
 	"strconv"
 	"strings"
@@ -275,4 +276,238 @@ func parsePrice(priceStr string) float64 {
 		return 0.0
 	}
 	return price
+}
+
+// ============================================================================
+// DNS Provider Methods
+// ============================================================================
+
+// ListRecords retrieves all DNS records for a domain
+func (p *PorkbunProvider) ListRecords(ctx context.Context, domain string) ([]dns.Record, error) {
+	if p.client == nil {
+		return nil, fmt.Errorf("porkbun client not configured")
+	}
+
+	// Get all DNS records for the domain
+	resp, err := p.client.Dns.GetRecords(ctx, domain, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list DNS records: %w", err)
+	}
+
+	// Convert Porkbun records to our DNS record format
+	var dnsRecords []dns.Record
+	for _, record := range resp.Records {
+		dnsRecord, err := p.convertFromPorkbunRecord(record, domain)
+		if err != nil {
+			log.Warnf("Failed to convert Porkbun record %v: %v", record.ID, err)
+			continue
+		}
+		dnsRecords = append(dnsRecords, dnsRecord)
+	}
+
+	log.Debugf("Retrieved %d DNS records for domain %s", len(dnsRecords), domain)
+	return dnsRecords, nil
+}
+
+// SetRecord creates or updates a DNS record
+func (p *PorkbunProvider) SetRecord(ctx context.Context, domain string, record dns.Record) error {
+	if p.client == nil {
+		return fmt.Errorf("porkbun client not configured")
+	}
+
+	// Check if record already exists
+	existingRecord, err := p.findExistingRecord(ctx, domain, record.Name, record.Type)
+	if err != nil {
+		return fmt.Errorf("failed to check for existing record: %w", err)
+	}
+
+	if existingRecord != nil {
+		// Update existing record
+		log.Debugf("Updating existing DNS record: %s %s %s", record.Name, record.Type, record.Content)
+		return p.updateRecord(ctx, domain, *existingRecord.ID, record)
+	} else {
+		// Create new record
+		log.Debugf("Creating new DNS record: %s %s %s", record.Name, record.Type, record.Content)
+		return p.createRecord(ctx, domain, record)
+	}
+}
+
+// DeleteRecord removes a DNS record by ID
+func (p *PorkbunProvider) DeleteRecord(ctx context.Context, domain, recordID string) error {
+	if p.client == nil {
+		return fmt.Errorf("porkbun client not configured")
+	}
+
+	// Convert string ID to int64
+	id, err := strconv.ParseInt(recordID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid record ID format: %w", err)
+	}
+
+	_, err = p.client.Dns.DeleteRecord(ctx, domain, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete DNS record %s: %w", recordID, err)
+	}
+
+	log.Debugf("Deleted DNS record %s", recordID)
+	return nil
+}
+
+// GetRecord retrieves a specific DNS record by name and type
+func (p *PorkbunProvider) GetRecord(ctx context.Context, domain, name, recordType string) (*dns.Record, error) {
+	if p.client == nil {
+		return nil, fmt.Errorf("porkbun client not configured")
+	}
+
+	existingRecord, err := p.findExistingRecord(ctx, domain, name, recordType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find DNS record: %w", err)
+	}
+
+	if existingRecord == nil {
+		return nil, fmt.Errorf("DNS record not found")
+	}
+
+	dnsRecord, err := p.convertFromPorkbunRecord(*existingRecord, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert record: %w", err)
+	}
+
+	return &dnsRecord, nil
+}
+
+// ============================================================================
+// DNS Helper Methods
+// ============================================================================
+
+// findExistingRecord searches for an existing DNS record by name and type
+func (p *PorkbunProvider) findExistingRecord(ctx context.Context, domain, name, recordType string) (*porkbun.DnsRecord, error) {
+	// Normalize the subdomain for Porkbun API
+	subdomain := p.normalizeSubdomain(name, domain)
+
+	// Get records by type and subdomain
+	resp, err := p.client.Dns.GetRecordsByType(ctx, domain, porkbun.DnsRecordType(recordType), &subdomain)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the first matching record if any exist
+	if len(resp.Records) > 0 {
+		return &resp.Records[0], nil
+	}
+
+	return nil, nil
+}
+
+// createRecord creates a new DNS record in Porkbun
+func (p *PorkbunProvider) createRecord(ctx context.Context, domain string, record dns.Record) error {
+	porkbunRecord := p.convertToPorkbunRecord(record, domain)
+
+	_, err := p.client.Dns.CreateRecord(ctx, domain, &porkbunRecord)
+	return err
+}
+
+// updateRecord updates an existing DNS record in Porkbun
+func (p *PorkbunProvider) updateRecord(ctx context.Context, domain string, recordID int64, record dns.Record) error {
+	porkbunRecord := p.convertToPorkbunRecord(record, domain)
+
+	editRecord := &porkbun.EditRecord{
+		Type:    porkbunRecord.Type,
+		Name:    porkbunRecord.Name,
+		Content: porkbunRecord.Content,
+		TTL:     porkbunRecord.TTL,
+		Prio:    porkbunRecord.Prio,
+	}
+
+	_, err := p.client.Dns.EditRecord(ctx, domain, recordID, editRecord)
+	return err
+}
+
+// convertFromPorkbunRecord converts a Porkbun DNS record to our format
+func (p *PorkbunProvider) convertFromPorkbunRecord(porkbunRecord porkbun.DnsRecord, domain string) (dns.Record, error) {
+	record := dns.Record{
+		Type:    string(porkbunRecord.Type),
+		Content: porkbunRecord.Content,
+	}
+
+	// Convert record ID from int64 to string
+	if porkbunRecord.ID != nil {
+		record.ID = strconv.FormatInt(*porkbunRecord.ID, 10)
+	}
+
+	// Convert TTL from string to int
+	if porkbunRecord.TTL != "" {
+		ttl, err := strconv.Atoi(porkbunRecord.TTL)
+		if err != nil {
+			log.Warnf("Failed to parse TTL '%s': %v", porkbunRecord.TTL, err)
+			ttl = 300 // Default TTL
+		}
+		record.TTL = ttl
+	} else {
+		record.TTL = 300 // Default TTL
+	}
+
+	// Handle priority for MX records
+	if porkbunRecord.Prio != "" {
+		priority, err := strconv.Atoi(porkbunRecord.Prio)
+		if err != nil {
+			log.Warnf("Failed to parse priority '%s': %v", porkbunRecord.Prio, err)
+		} else {
+			record.Priority = &priority
+		}
+	}
+
+	// Convert subdomain name to our format
+	record.Name = p.denormalizeSubdomain(porkbunRecord.Name, domain)
+
+	return record, nil
+}
+
+// convertToPorkbunRecord converts our DNS record to Porkbun format
+func (p *PorkbunProvider) convertToPorkbunRecord(record dns.Record, domain string) porkbun.DnsRecord {
+	porkbunRecord := porkbun.DnsRecord{
+		Type:    porkbun.DnsRecordType(record.Type),
+		Name:    p.normalizeSubdomain(record.Name, domain),
+		Content: record.Content,
+		TTL:     strconv.Itoa(record.TTL),
+	}
+
+	// Handle priority for MX records
+	if record.Priority != nil {
+		porkbunRecord.Prio = strconv.Itoa(*record.Priority)
+	}
+
+	return porkbunRecord
+}
+
+// normalizeSubdomain converts record names to Porkbun subdomain format
+func (p *PorkbunProvider) normalizeSubdomain(name, domain string) string {
+	// Handle root domain
+	if name == "@" || name == "" || name == domain {
+		return ""
+	}
+
+	// If name is already just the subdomain, return as-is
+	if !strings.Contains(name, ".") {
+		return name
+	}
+
+	// If name is FQDN, extract subdomain
+	if strings.HasSuffix(name, "."+domain) {
+		return strings.TrimSuffix(name, "."+domain)
+	}
+
+	// Default: return name as-is
+	return name
+}
+
+// denormalizeSubdomain converts Porkbun subdomain format to our record name format
+func (p *PorkbunProvider) denormalizeSubdomain(subdomain, domain string) string {
+	// Handle root domain
+	if subdomain == "" {
+		return "@"
+	}
+
+	// Return subdomain as-is for non-root records
+	return subdomain
 }
