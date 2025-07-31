@@ -1,0 +1,153 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  # Update this to match your module name from go.mod
+  MODULE_NAME: indietool/cli
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Get version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create release directory
+      run: mkdir -p dist
+
+    - name: Build binaries
+      run: |
+        VERSION=${{ steps.version.outputs.VERSION }}
+        # Remove 'v' prefix for binary naming
+        VERSION_NUM=${VERSION#v}
+        
+        # Linux AMD64
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" \
+          -o dist/indietool-${VERSION_NUM}-linux-amd64 cmd/indietool/main.go
+        
+        # Linux ARM64
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION}" \
+          -o dist/indietool-${VERSION_NUM}-linux-arm64 cmd/indietool/main.go
+        
+        # macOS AMD64
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" \
+          -o dist/indietool-${VERSION_NUM}-darwin-amd64 cmd/indietool/main.go
+        
+        # macOS ARM64 (Apple Silicon)
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION}" \
+          -o dist/indietool-${VERSION_NUM}-darwin-arm64 cmd/indietool/main.go
+        
+        # Windows AMD64
+        GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" \
+          -o dist/indietool-${VERSION_NUM}-windows-amd64.exe cmd/indietool/main.go
+
+    - name: Create archive files
+      run: |
+        VERSION=${{ steps.version.outputs.VERSION }}
+        VERSION_NUM=${VERSION#v}
+        cd dist
+        
+        # Create tar.gz for Unix systems
+        tar -czf indietool-${VERSION_NUM}-linux-amd64.tar.gz indietool-${VERSION_NUM}-linux-amd64
+        tar -czf indietool-${VERSION_NUM}-linux-arm64.tar.gz indietool-${VERSION_NUM}-linux-arm64
+        tar -czf indietool-${VERSION_NUM}-darwin-amd64.tar.gz indietool-${VERSION_NUM}-darwin-amd64
+        tar -czf indietool-${VERSION_NUM}-darwin-arm64.tar.gz indietool-${VERSION_NUM}-darwin-arm64
+        
+        # Create zip for Windows
+        zip indietool-${VERSION_NUM}-windows-amd64.zip indietool-${VERSION_NUM}-windows-amd64.exe
+
+    - name: Generate checksums
+      run: |
+        cd dist
+        sha256sum *.tar.gz *.zip > checksums.txt
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION=${{ steps.version.outputs.VERSION }}
+        cat > release_notes.md << EOF
+        # IndyTool $VERSION
+        
+        ## What's New
+        
+        <!-- Add your release notes here -->
+        
+        ## Installation
+        
+        ### Homebrew (macOS/Linux)
+        \`\`\`bash
+        brew install your-username/tap/indietool
+        \`\`\`
+        
+        ### Manual Installation
+        
+        1. Download the appropriate binary for your platform from the assets below
+        2. Extract the archive
+        3. Move the binary to a directory in your PATH (e.g., \`/usr/local/bin\`)
+        4. Make it executable: \`chmod +x indietool\`
+        
+        ### Verification
+        
+        All binaries are signed with checksums. Verify your download:
+        \`\`\`bash
+        sha256sum -c checksums.txt
+        \`\`\`
+        
+        ## Supported Platforms
+        
+        - **macOS**: Intel (amd64) and Apple Silicon (arm64)
+        - **Linux**: Intel (amd64) and ARM64
+        - **Windows**: Intel (amd64)
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: IndyTool ${{ steps.version.outputs.VERSION }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        files: |
+          dist/*.tar.gz
+          dist/*.zip
+          dist/checksums.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Trigger Homebrew tap update
+      if: github.event_name == 'push'
+      run: |
+        # This will be used to automatically update the Homebrew formula
+        echo "Release created successfully!"
+        echo "Version: ${{ steps.version.outputs.VERSION }}"
+        echo "Don't forget to update your Homebrew tap repository!"
