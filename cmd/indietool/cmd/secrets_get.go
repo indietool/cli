@@ -17,7 +17,7 @@ var secretsGetCmd = &cobra.Command{
 }
 
 func init() {
-	secretsGetCmd.Flags().BoolP("show", "s", false, "Show the actual secret value (WARNING: will be visible in terminal)")
+	secretsGetCmd.Flags().BoolP("show", "S", false, "Show the actual secret value (WARNING: will be visible in terminal)")
 }
 
 func getSecret(cmd *cobra.Command, args []string) error {
@@ -54,6 +54,12 @@ func getSecret(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to retrieve secret: %w", err)
 	}
 
+	if show {
+		// Only output the secret value when --show is used
+		fmt.Print(secret.Value)
+		return nil
+	}
+
 	// Check if secret is expired
 	if secret.IsExpired() {
 		fmt.Printf("⚠️  WARNING: Secret '%s' has expired!\n", name)
@@ -61,13 +67,7 @@ func getSecret(cmd *cobra.Command, args []string) error {
 
 	// Display secret information
 	fmt.Printf("Name: %s\n", secret.Name)
-
-	if show {
-		fmt.Printf("⚠️  WARNING: Secret value will be displayed in plaintext!\n")
-		fmt.Printf("Value: %s\n", secret.Value)
-	} else {
-		fmt.Printf("Value: ***MASKED*** (use --show to show)\n")
-	}
+	fmt.Printf("Value: ***MASKED*** (use --show to show)\n")
 
 	if secret.Note != "" {
 		fmt.Printf("Note: %s\n", secret.Note)
