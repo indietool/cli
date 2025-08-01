@@ -10,9 +10,10 @@ import (
 )
 
 var secretsListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list [@database]",
 	Short: "List all secrets",
-	Long:  "List all secrets in the database. Values are never displayed for security.",
+	Long:  "List all secrets in the database. Values are never displayed for security. Use @database to list secrets from a specific database.",
+	Args:  cobra.MaximumNArgs(1),
 	RunE:  listSecrets,
 }
 
@@ -30,7 +31,22 @@ func listSecrets(cmd *cobra.Command, args []string) error {
 
 	// Get secrets config
 	secretsConfig := cfg.GetSecretsConfig()
-	database := secretsConfig.GetDefaultDatabase()
+
+	// Parse database from argument if provided
+	var database string
+	if len(args) > 0 {
+		arg := strings.TrimSpace(args[0])
+		if strings.HasPrefix(arg, "@") {
+			database = strings.TrimPrefix(arg, "@")
+			if database == "" {
+				return fmt.Errorf("database name cannot be empty after @")
+			}
+		} else {
+			return fmt.Errorf("database argument must start with @ (e.g., @mydb)")
+		}
+	} else {
+		database = secretsConfig.GetDefaultDatabase()
+	}
 
 	manager, err := secrets.NewManager(secretsConfig)
 	if err != nil {
@@ -98,12 +114,12 @@ func listSecrets(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Printf("%s  %s  %s", name, created, updated)
-		
+
 		if showNotes {
 			note := padRight(secret.Note, maxNoteWidth)
 			fmt.Printf("  %s", note)
 		}
-		
+
 		fmt.Printf("  %s\n", status)
 	}
 
