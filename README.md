@@ -75,7 +75,7 @@ indietool dns set myproject.com @ A 203.0.113.10
 indietool dns set myproject.com www CNAME myproject.com
 
 # Export secrets for deployment
-export OPENAI_KEY=$(indietool secret get openai-key --show --json | jq -r '.value')
+export OPENAI_KEY=$(indietool secret get openai-key -S)
 ```
 
 ---
@@ -301,7 +301,7 @@ indietool secret set api-key@staging "staging_key_456"
 indietool secret set db-password@myproject "secret123"
 
 # Retrieve from specific database
-indietool secret get api-key@production --show
+indietool secret get api-key@production -S
 ```
 
 #### Retrieve a secret
@@ -310,8 +310,8 @@ indietool secret get api-key@production --show
 # Safe output (masked)
 indietool secret get stripe-key
 
-# Show actual value
-indietool secret get stripe-key --show
+# Show actual value (use -S or --show)
+indietool secret get stripe-key -S
 ```
 
 #### List all secrets
@@ -349,7 +349,7 @@ indietool secrets db delete staging --force
 #### Use in environment variable
 
 ```bash
-export STRIPE_KEY=$(indietool secret get stripe-key --show --json | jq -r '.value')
+export STRIPE_KEY=$(indietool secret get stripe-key -S)
 ```
 
 ---
