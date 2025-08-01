@@ -95,7 +95,7 @@ jobs:
       run: |
         VERSION=${{ steps.version.outputs.VERSION }}
         cat > release_notes.md << EOF
-        # IndyTool $VERSION
+        # indietool $VERSION
 
         ## What's New
 
@@ -105,7 +105,7 @@ jobs:
 
         ### Homebrew (macOS/Linux)
         \`\`\`bash
-        brew install your-username/tap/indietool
+        brew install indietool/tap/indietool
         \`\`\`
 
         ### Manual Installation
@@ -133,7 +133,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.version.outputs.VERSION }}
-        name: IndyTool ${{ steps.version.outputs.VERSION }}
+        name: indietool ${{ steps.version.outputs.VERSION }}
         body_path: release_notes.md
         draft: false
         prerelease: false
@@ -154,10 +154,11 @@ jobs:
         SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
 
         # Clone the homebrew tap repo
-        git clone https://github.com/indietool/homebrew.git homebrew-tap
+        git clone https://github.com/indietool/homebrew-tap.git homebrew-tap
         cd homebrew-tap
 
         # Update the formula
+        sed -i "s|url \".*\"|url \"$TARBALL_URL\"|" Formula/indietool.rb
         sed -i "s/version \".*\"/version \"${VERSION#v}\"/" Formula/indietool.rb
         sed -i "s/sha256 \".*\"/sha256 \"$SHA256\"/" Formula/indietool.rb
 
@@ -166,6 +167,6 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add Formula/indietool.rb
         git commit -m "Update indietool to ${VERSION}"
-        git push https://x-access-token:${{ secrets.HOMEBREW_TOKEN }}@github.com/indietool/homebrew.git
+        git push https://x-access-token:${{ secrets.HOMEBREW_TOKEN }}@github.com/indietool/homebrew-tap.git
       env:
         HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
