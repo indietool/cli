@@ -317,7 +317,12 @@ indietool secret get stripe-key -S
 #### List all secrets
 
 ```bash
+# List secrets in default database
 indietool secret list
+
+# List secrets in specific database
+indietool secret list @production
+indietool secret list @staging
 ```
 
 #### Manage databases
