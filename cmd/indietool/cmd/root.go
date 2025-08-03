@@ -25,6 +25,7 @@ func expandTildePath(path string) string {
 }
 
 var (
+	version = "dev"
 	// configPath        string
 	// defaultConfigPath string // Store default config path to detect when using default
 	jsonOutput       bool
@@ -117,6 +118,7 @@ func initConfig() {
 
 	// Store the loaded (or empty) config globally
 	appConfig = cfg
+	appConfig.Version = version
 
 	// Only log success and validate if config is valid
 	if cfg.Valid() {
@@ -198,6 +200,27 @@ func GetConfig() *indietool.Config {
 // This function should be called from other commands to access providers.
 func GetProviderRegistry() *indietool.Registry {
 	return providerRegistry
+}
+
+// SetVersion sets the version in the global app config
+func SetVersion(appVersion string) {
+	if appConfig != nil {
+		appConfig.Version = appVersion
+	}
+
+	if metricsAgent != nil {
+		metricsAgent.SetVersion(appVersion)
+	}
+
+	version = appVersion
+}
+
+// GetVersion returns the version from the global app config
+func GetVersion() string {
+	if appConfig != nil {
+		return appConfig.Version
+	}
+	return "dev"
 }
 
 // saveConfigIfValid saves the configuration back to its loaded path if it's valid.

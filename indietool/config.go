@@ -30,6 +30,7 @@ type Config struct {
 	Providers ProvidersConfig `yaml:"providers"`
 	Secrets   secrets.Config  `yaml:"secrets"`
 	Path      string          `yaml:"-"` // Path where config was successfully loaded from
+	Version   string          `yaml:"-"` // Version set during app initialization
 }
 
 // DomainsConfig holds all domain-related configuration
@@ -71,7 +72,8 @@ func LoadFromPath(path string) (*Config, error) {
 
 func GetDefaultConfig() *Config {
 	cfg := &Config{
-		Path: DefaultConfigFileLocation,
+		Path:    DefaultConfigFileLocation,
+		Version: "dev", // Default version
 		Domains: DomainsConfig{
 			Providers: []string{},
 			Management: ManagementConfig{
