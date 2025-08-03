@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"indietool/cli/indietool"
+	"indietool/cli/indietool/metrics"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,8 @@ var (
 	// configPath        string
 	// defaultConfigPath string // Store default config path to detect when using default
 	jsonOutput       bool
-	providerRegistry *indietool.Registry // Global provider registry
+	providerRegistry *indietool.Registry  // Global provider registry
+	metricsAgent     = metrics.NewAgent() // Global metrics agent
 
 	appConfig = indietool.GetDefaultConfig() // Get a copy of default config
 )
@@ -56,10 +58,44 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Send tracking call immediately in background
+	var metricsDone <-chan struct{}
+	if metricsAgent != nil {
+		commandName := getExecutedCommand()
+		metricsDone = metricsAgent.Observe(commandName, os.Args[1:], 0)
+	}
+
 	err := rootCmd.Execute()
+
+	// Wait for metrics to complete before exiting
+	if metricsDone != nil {
+		<-metricsDone
+	}
+
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+// getExecutedCommand reconstructs the command name from os.Args
+func getExecutedCommand() string {
+	if len(os.Args) < 2 {
+		return "root"
+	}
+
+	// Filter out flags to get just the command parts
+	var commandParts []string
+	for _, arg := range os.Args[1:] {
+		if !strings.HasPrefix(arg, "-") {
+			commandParts = append(commandParts, arg)
+		}
+	}
+
+	if len(commandParts) == 0 {
+		return "root"
+	}
+
+	return strings.Join(commandParts, " ")
 }
 
 func init() {
