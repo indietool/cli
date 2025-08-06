@@ -1,0 +1,220 @@
+# GoReleaser v2 configuration for indietool
+# Documentation: https://goreleaser.com
+
+version: 2
+
+project_name: indietool
+
+# Clean dist directory before building
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+# Build configuration
+builds:
+  - id: indietool
+    binary: indietool
+    main: ./cmd/indietool
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X github.com/indietool/cli/cmd/indietool/cmd.version={{.Version}}
+
+# Archive configuration (matches current naming)
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+# Generate checksums
+checksum:
+  name_template: 'checksums.txt'
+
+# Snapshot builds (for unreleased versions)
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+# Changelog configuration
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - '^style:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+
+# DEB and RPM packages
+nfpms:
+  - id: packages
+    package_name: indietool
+
+    # Package info
+    vendor: indietool
+    homepage: https://github.com/indietool/cli
+    description: |-
+      indie builder toolkit
+      A comprehensive CLI tool for indie builders to manage domains,
+      secrets, DNS, and more across multiple providers.
+
+    # Maintainer info
+    maintainer: indietool <hello@indietool.com>
+    license: Apache 2
+
+    # Binary location
+    bindir: /usr/bin
+
+    # Package formats
+    formats:
+      - deb
+      - rpm
+      - apk
+
+    # Dependencies
+    dependencies:
+      - ca-certificates
+
+    # Package metadata
+    section: utils
+    priority: optional
+
+    # DEB-specific configuration
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+        - changelog-file-missing-in-native-package
+
+    # RPM-specific configuration
+    rpm:
+      group: Applications/System
+      compression: lzma
+
+    # File mappings
+    contents:
+      # Configuration directory
+      - src: ./dist/empty_dir
+        dst: /etc/indietool
+        type: dir
+        file_info:
+          mode: 0755
+
+      # Man page (if you create one)
+      # - src: ./man/indietool.1
+      #   dst: /usr/share/man/man1/indietool.1
+      #   file_info:
+      #     mode: 0644
+
+# Homebrew formula
+brews:
+  - name: indietool
+
+    # Repository info
+    repository:
+      owner: indietool
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TOKEN }}"
+
+    # Package info
+    homepage: https://github.com/indietool/cli
+    description: "An all-in-one tool for unified infrastructure management"
+    license: Apache 2
+
+    # Dependencies
+    dependencies:
+      - name: ca-certificates
+        type: optional
+
+    # Installation test
+    test: |
+      system "#{bin}/indietool", "--version"
+
+    # Additional install steps
+    install: |-
+      bin.install "indietool"
+
+      # Generate shell completions
+      generate_completions_from_executable(bin/"indietool", "completion")
+
+# GitHub release
+release:
+  github:
+    owner: indietool
+    name: cli
+
+  # Release notes
+  header: |
+    ## indietool {{ .Tag }}
+
+    ### Installation
+
+    #### Package Managers
+
+    **Homebrew (macOS/Linux):**
+    ```bash
+    brew install indietool/tap/indietool
+    ```
+
+    **Debian/Ubuntu (.deb):**
+    ```bash
+    # Download the .deb file from assets below
+    sudo dpkg -i indietool_{{ .Version }}_linux_amd64.deb
+    ```
+
+    **RedHat/Fedora/SUSE (.rpm):**
+    ```bash
+    # Download the .rpm file from assets below
+    sudo rpm -i indietool_{{ .Version }}_linux_amd64.rpm
+    ```
+
+    #### Manual Installation
+
+    1. Download the appropriate binary for your platform from the assets below
+    2. Extract the archive: `tar -xzf indietool-{{ .Version }}-linux-amd64.tar.gz`
+    3. Move to PATH: `sudo mv indietool /usr/local/bin/`
+    4. Make executable: `chmod +x /usr/local/bin/indietool`
+
+    #### Verification
+
+    All releases are signed with checksums:
+    ```bash
+    sha256sum -c checksums.txt
+    ```
+
+  footer: |
+    ### Supported Platforms
+
+    - **Linux**: Intel (amd64), ARM64 - Binary, DEB, RPM, APK packages
+    - **macOS**: Intel (amd64), Apple Silicon (arm64) - Binary, Homebrew
+    - **Windows**: Intel (amd64) - Binary
+
+    ---
+
+    **Full Changelog**: https://github.com/indietool/cli/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+# Announce (optional - can be configured later)
+# announce:
+#   slack:
+#     enabled: true
+#     message_template: 'indietool {{ .Tag }} is out! Check it out: {{ .ReleaseURL }}'
+#     channel: '#releases'
+#
+#   discord:
+#     enabled: true
+#     message_template: 'indietool {{ .Tag }} has been released! {{ .ReleaseURL }}'
