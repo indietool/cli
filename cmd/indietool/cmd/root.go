@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
@@ -33,6 +35,10 @@ var (
 	providerRegistry *indietool.Registry  // Global provider registry
 	metricsAgent     = metrics.NewAgent() // Global metrics agent
 
+	// Tracking completion management
+	pendingItemsWG    sync.WaitGroup
+	pendingItemsMutex sync.Mutex
+
 	appConfig = indietool.GetDefaultConfig() // Get a copy of default config
 )
 
@@ -58,44 +64,14 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// Send tracking call immediately in background
-	var metricsDone <-chan struct{}
-	if metricsAgent != nil {
-		commandName := getExecutedCommand()
-		metricsDone = metricsAgent.Observe(commandName, os.Args[1:], 0)
-	}
-
 	err := rootCmd.Execute()
 
-	// Wait for metrics to complete before exiting
-	if metricsDone != nil {
-		<-metricsDone
-	}
+	// Wait for all pending tracking items to complete
+	pendingItemsWG.Wait()
 
 	if err != nil {
 		os.Exit(1)
 	}
-}
-
-// getExecutedCommand reconstructs the command name from os.Args
-func getExecutedCommand() string {
-	if len(os.Args) < 2 {
-		return "root"
-	}
-
-	// Filter out flags to get just the command parts
-	var commandParts []string
-	for _, arg := range os.Args[1:] {
-		if !strings.HasPrefix(arg, "-") {
-			commandParts = append(commandParts, arg)
-		}
-	}
-
-	if len(commandParts) == 0 {
-		return "root"
-	}
-
-	return strings.Join(commandParts, " ")
 }
 
 func init() {
@@ -236,6 +212,33 @@ func GetConfig() *indietool.Config {
 // This function should be called from other commands to access providers.
 func GetProviderRegistry() *indietool.Registry {
 	return providerRegistry
+}
+
+// GetMetricsAgent returns the globally initialized metrics agent.
+// This function should be called from other commands to send metrics.
+func GetMetricsAgent() *metrics.Agent {
+	return metricsAgent
+}
+
+// PendingItems registers a tracking item that needs to complete before CLI exit.
+// It spins up a goroutine to wait for the done channel with timeout handling.
+func PendingItems(done <-chan struct{}) {
+	pendingItemsMutex.Lock()
+	defer pendingItemsMutex.Unlock()
+
+	// Add to wait group before spinning up goroutine
+	pendingItemsWG.Add(1)
+
+	// Spin up waiting goroutine
+	go func() {
+		defer pendingItemsWG.Done()
+		select {
+		case <-done:
+			// Tracking completed successfully
+		case <-time.After(3 * time.Second):
+			// Timeout - don't block CLI exit
+		}
+	}()
 }
 
 // SetVersion sets the version in the global app config
