@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -55,6 +56,11 @@ func listSecrets(cmd *cobra.Command, args []string) error {
 
 	secretsList, err := manager.ListSecrets(database)
 	if err != nil {
+		// Check if it's the specific "database not found" error
+		if errors.Is(err, secrets.ErrSecretDBNotFound) {
+			fmt.Println("No secrets found. Create one with `secrets set name mypassword`")
+			return nil
+		}
 		return fmt.Errorf("failed to list secrets: %w", err)
 	}
 

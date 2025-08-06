@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 )
+
+// ErrSecretDBNotFound is returned when the secrets database does not exist
+var ErrSecretDBNotFound = errors.New("secrets database not found")
 
 // Storage handles persistent storage of encrypted secrets using BadgerDB
 type Storage struct {
@@ -36,6 +40,14 @@ func (s *Storage) getDBPath(database string) string {
 // openDB opens a BadgerDB instance for the specified database
 func (s *Storage) openDB(database string, readonly bool) (*badger.DB, error) {
 	dbPath := s.getDBPath(database)
+
+	// Only check if database directory exists when opening in read-only mode
+	// For write mode, BadgerDB will automatically create the directory
+	if readonly {
+		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("%w: %s", ErrSecretDBNotFound, database)
+		}
+	}
 
 	opts := badger.DefaultOptions(dbPath)
 	opts.ReadOnly = readonly
