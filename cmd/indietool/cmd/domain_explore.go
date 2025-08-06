@@ -20,10 +20,24 @@ var (
 // exploreCmd represents the explore command
 var exploreCmd = &cobra.Command{
 	Use:   "explore [domain-name]",
-	Short: "Explore domain availability across popular TLDs",
-	Long: `Check availability of a domain name across multiple popular TLDs.
-Takes a domain name (with or without TLD) and checks availability across
-popular TLDs favored by indie hackers and small startups.
+	Short: "Explore domain availability across multiple TLDs",
+	Long: `Explore the availability of a domain name across multiple Top-Level Domains (TLDs).
+Perfect for finding the right domain extension for your project or business.
+
+Takes a base domain name (with or without TLD) and checks availability across
+popular TLDs favored by indie hackers, startups, and developers. By default,
+it checks popular extensions like .com, .org, .dev, .io, .co, and more.
+
+You can customize the TLD list using the --tlds flag with a comma-separated list
+or reference a file containing TLDs. The command automatically extracts the base
+domain name if you provide a full domain.
+
+Output options:
+  --tlds        Comma-separated list of TLDs or @filename for file input
+  --wide        Show additional columns (cost, expiry, error details)
+  --json        Output results in JSON format
+  --no-color    Disable colored output
+  --no-headers  Don't show column headers
 
 Examples:
   indietool domain explore kopitiam
@@ -31,7 +45,7 @@ Examples:
   indietool domain explore mycompany --json
   indietool domain explore startup --tlds com,org,dev,ai
   indietool domain explore webapp --tlds @tlds.txt
-  indietool domain explore myapp --wide`,
+  indietool domain explore myapp --wide --no-color`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		input := strings.TrimSpace(strings.ToLower(args[0]))

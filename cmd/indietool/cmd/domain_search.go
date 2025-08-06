@@ -19,14 +19,25 @@ var (
 // searchCmd represents the search command
 var searchCmd = &cobra.Command{
 	Use:   "search [domain...]",
-	Short: "Search for domain availability using RDAP",
-	Long: `Search for domain availability using the Registration Data Access Protocol (RDAP).
-Takes one or more domain names as arguments and checks their registration status.
+	Short: "Check availability of specific domain names",
+	Long: `Check the availability and registration status of one or more specific domain names
+using the Registration Data Access Protocol (RDAP). This provides reliable, real-time
+information about domain registration status directly from registries.
+
+The command accepts multiple domain names and checks them concurrently for faster results.
+Results include availability status, registrar information, and registration details.
+
+Output options:
+  --wide        Show additional columns (registrar, cost, expiry, error details)
+  --json        Output results in JSON format
+  --no-color    Disable colored output
+  --no-headers  Don't show column headers
 
 Examples:
   indietool domain search example.com
   indietool domain search example.com google.com --json
-  indietool domain search mydomain.org anotherdomain.net --wide`,
+  indietool domain search mydomain.org anotherdomain.net --wide
+  indietool domain search startup.dev indie.co --no-color`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		domainList := make([]string, 0, len(args))

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"indietool/cli/dns"
-	"indietool/cli/indietool"
 	"indietool/cli/output"
 	"os"
 
@@ -12,12 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	dnsListProvider   string
-	dnsListWideOutput bool
-	dnsListNoHeaders  bool
-	dnsListNoColor    bool
-)
+// DNS list command no longer needs its own flags - uses parent flags
 
 var dnsListCmd = &cobra.Command{
 	Use:   "list <domain>",
@@ -33,25 +27,15 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		domain := args[0]
 
-		// Get the global provider registry
-		registry := GetProviderRegistry()
-		if registry == nil {
-			handleDNSError(fmt.Errorf("provider registry not initialized"))
+		// Get DNS manager from parent command
+		dnsManager := GetDNSManager()
+		if dnsManager == nil {
+			handleDNSError(fmt.Errorf("DNS manager not initialized"))
 			return
 		}
 
-		// Get DNS providers from registry
-		dnsProviders := indietool.GetProviders[dns.Provider](registry)
-		if len(dnsProviders) == 0 {
-			handleDNSError(fmt.Errorf("no DNS providers configured"))
-			return
-		}
-
-		// Create DNS manager
-		dnsManager := dns.NewManager(dnsProviders)
-
-		// List DNS records
-		records, detectionResult, err := dnsManager.ListRecords(context.TODO(), domain, dnsListProvider)
+		// List DNS records using parent provider flag
+		records, detectionResult, err := dnsManager.ListRecords(context.TODO(), domain, GetDNSProvider())
 		if err != nil {
 			handleDNSError(fmt.Errorf("failed to list DNS records: %w", err))
 			return
@@ -78,16 +62,7 @@ Examples:
 
 func init() {
 	dnsCmd.AddCommand(dnsListCmd)
-
-	// Provider flag
-	dnsListCmd.Flags().StringVar(&dnsListProvider, "provider", "", "DNS provider to query (cloudflare, namecheap, porkbun, godaddy)")
-
-	// Output format flags
-	dnsListCmd.Flags().BoolVarP(&dnsListWideOutput, "wide", "w", false, "Show additional columns (ID, TTL, Priority)")
-	dnsListCmd.Flags().BoolVar(&dnsListNoHeaders, "no-headers", false, "Don't show column headers")
-	dnsListCmd.Flags().BoolVar(&dnsListNoColor, "no-color", false, "Disable colored output")
-
-	// Global JSON flag is inherited from root.go
+	// Flags are now handled by parent dns command
 }
 
 func outputDNSRecordsTable(records []dns.Record, domain string) {
@@ -96,16 +71,19 @@ func outputDNSRecordsTable(records []dns.Record, domain string) {
 		return
 	}
 
+	// Get output flags from parent DNS command
+	wide, noHeaders, noColor := GetDNSOutputFlags()
+
 	// Create table configuration
 	options := output.TableOptions{
-		Wide:      dnsListWideOutput,
-		NoHeaders: dnsListNoHeaders,
-		NoColor:   dnsListNoColor,
+		Wide:      wide,
+		NoHeaders: noHeaders,
+		NoColor:   noColor,
 		Format:    output.FormatTable,
 		Writer:    os.Stdout,
 	}
 
-	if dnsListWideOutput {
+	if wide {
 		options.Format = output.FormatWide
 	}
 
@@ -135,7 +113,7 @@ func outputDNSRecordsTable(records []dns.Record, domain string) {
 
 		// var row []interface{}
 		var row map[string]any
-		if dnsListWideOutput {
+		if wide {
 			priority := ""
 			if record.Priority != nil {
 				priority = fmt.Sprintf("%d", *record.Priority)
@@ -160,7 +138,7 @@ func outputDNSRecordsTable(records []dns.Record, domain string) {
 	}
 
 	// Show summary
-	if !dnsListNoHeaders {
+	if !noHeaders {
 		fmt.Printf("\nDNS Records for %s (%d total)\n\n", domain, len(records))
 	}
 

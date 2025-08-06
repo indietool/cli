@@ -17,6 +17,21 @@ domain management preferences, and other application settings.
 Examples:
   indietool config add provider cloudflare --api-key KEY --email EMAIL
   indietool config add provider porkbun --api-key KEY --api-secret SECRET`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Send metrics for config commands
+		if metricsAgent := GetMetricsAgent(); metricsAgent != nil {
+			commandName := "config " + cmd.Name()
+			metadata := make(map[string]string)
+
+			// Track provider for config add provider commands
+			if len(args) >= 3 && args[0] == "add" && args[1] == "provider" {
+				metadata["provider"] = args[2]
+			}
+
+			// Track command execution asynchronously
+			PendingItems(metricsAgent.Observe(commandName, args, metadata, 0))
+		}
+	},
 }
 
 func init() {

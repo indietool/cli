@@ -12,13 +12,38 @@ import (
 // domainCmd represents the domain command
 var domainCmd = &cobra.Command{
 	Use:   "domain",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Domain discovery and availability checking",
+	Long: `Search for domain availability and explore domain names across multiple TLDs.
+Uses RDAP (Registration Data Access Protocol) for reliable domain status checking.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+This command provides domain discovery tools for indie hackers and startups to find
+available domain names. It supports checking individual domains or exploring a base
+name across popular TLDs.
+
+Available subcommands:
+  search   Check availability of specific domain names
+  explore  Explore a domain name across multiple popular TLDs
+
+Examples:
+  indietool domain search example.com
+  indietool domain explore myapp
+  indietool domain explore startup --tlds com,org,dev,ai
+
+The domain command also shows your current configuration status including
+enabled registrars and configuration validation results.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Send metrics for domain command and subcommands
+		if metricsAgent := GetMetricsAgent(); metricsAgent != nil {
+			commandName := "domain " + cmd.Name()
+			metadata := make(map[string]string)
+
+			// No specific metadata needed for domain commands yet
+			// Future: could track provider info if domain commands get provider-specific features
+
+			// Track command execution asynchronously
+			PendingItems(metricsAgent.Observe(commandName, args, metadata, 0))
+		}
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Example of using the global config
 		cfg := GetConfig()
