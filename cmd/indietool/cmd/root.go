@@ -32,6 +32,7 @@ var (
 	// configPath        string
 	// defaultConfigPath string // Store default config path to detect when using default
 	jsonOutput       bool
+	verbose          bool
 	providerRegistry *indietool.Registry  // Global provider registry
 	metricsAgent     = metrics.NewAgent() // Global metrics agent
 
@@ -83,6 +84,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVarP(&appConfig.Path, "config", "c", appConfig.Path, "config file path")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output results in JSON format")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose/debug logging")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -91,6 +93,13 @@ func init() {
 
 // initConfig loads the configuration from the specified config file path.
 func initConfig() {
+	// Configure logging level based on verbose flag
+	if verbose {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
 	// Expand tilde in the config path before loading
 	expandedConfigPath := expandTildePath(appConfig.Path)
 
