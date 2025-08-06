@@ -9,9 +9,12 @@ const (
 	// DefaultUmamiEndpoint is the default Umami tracking endpoint
 	DefaultUmamiEndpoint = "https://i.indietool.dev/api/send"
 	// DefaultWebsiteID is the Umami website ID extracted from the tracking script
-	DefaultWebsiteID = "6001c6b7-042a-40c5-96b3-81a8879bcef5"
+	DefaultWebsiteID = "810d8615-dbd3-4166-a4be-51529c7407da"
 
 	DefaultUserAgent = "indietool-cli"
+
+	// Umami tag
+	DefaultTag = "cli"
 )
 
 // Config holds configuration for metrics tracking
@@ -20,6 +23,7 @@ type Config struct {
 	Endpoint  string
 	WebsiteID string
 	UserAgent string
+	Tag       string
 }
 
 // NewConfig creates a new metrics configuration with defaults
@@ -29,6 +33,7 @@ func NewConfig() *Config {
 		Endpoint:  DefaultUmamiEndpoint,
 		WebsiteID: DefaultWebsiteID,
 		UserAgent: "indietool-cli",
+		Tag:       DefaultTag,
 	}
 }
 

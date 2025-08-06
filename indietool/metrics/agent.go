@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
-	"github.com/charmbracelet/log"
 )
 
 // Agent handles sending metrics to Umami
@@ -31,7 +29,7 @@ func (a *Agent) SetVersion(version string) {
 }
 
 // Observe sends a command execution event asynchronously and returns a channel to wait on
-func (a *Agent) Observe(command string, args []string, duration time.Duration) <-chan struct{} {
+func (a *Agent) Observe(command string, args []string, metadata map[string]string, duration time.Duration) <-chan struct{} {
 	done := make(chan struct{})
 
 	if !a.config.Enabled {
@@ -43,6 +41,15 @@ func (a *Agent) Observe(command string, args []string, duration time.Duration) <
 	go func() {
 		defer close(done)
 		event := NewCommandEvent(command, args, duration)
+
+		// Add metadata to event
+		if metadata != nil {
+			for k, v := range metadata {
+				event.Payload.Data[k] = v
+			}
+		}
+
+		event.Sanitise() // Remove sensitive information
 		a.sendEvent(event)
 	}()
 
@@ -55,6 +62,7 @@ func (a *Agent) sendEvent(event *UmamiPayload) {
 	defer cancel()
 
 	event.Payload.Website = a.config.WebsiteID
+	event.Payload.Tag = a.config.Tag
 
 	jsonData, err := json.Marshal(event)
 	if err != nil {
@@ -70,9 +78,5 @@ func (a *Agent) sendEvent(event *UmamiPayload) {
 	req.Header.Set("User-Agent", a.config.UserAgent)
 
 	// Send request and ignore response/errors to avoid blocking CLI
-	resp, rerr := a.client.Do(req)
-	if rerr != nil {
-		log.Errorf("failed to send metrics: %s", rerr)
-	}
-	log.Debugf("resp: %+v", resp)
+	a.client.Do(req)
 }
