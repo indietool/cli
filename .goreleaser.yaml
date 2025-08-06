@@ -37,7 +37,6 @@ archives:
     files:
       - README.md
       - LICENSE
-      - CHANGELOG.md
 
 # Generate checksums
 checksum:
