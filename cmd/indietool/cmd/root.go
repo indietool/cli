@@ -104,7 +104,7 @@ func initConfig() {
 			log.Infof("No config file found at default location, creating default config at: %s", expandedDefaultPath)
 
 			// Create default config
-			cfg := indietool.GetDefaultConfig()
+			cfg = indietool.GetDefaultConfig()
 
 			// Ensure the config directory exists (with all parent directories)
 			configDir := filepath.Dir(expandedDefaultPath)
