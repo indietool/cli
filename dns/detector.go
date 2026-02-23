@@ -28,6 +28,10 @@ var nameserverPatterns = map[string][]string{
 		".domaincontrol.com",
 		".godaddy.com",
 	},
+	"thelittlehost": {
+		".thelittlehost.net",
+		".thelittlehost.com",
+	},
 }
 
 // DetectorResult contains the result of DNS provider detection

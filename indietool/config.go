@@ -41,10 +41,11 @@ type DomainsConfig struct {
 
 // ProvidersConfig holds configuration for all supported providers
 type ProvidersConfig struct {
-	Cloudflare *providers.CloudflareConfig `yaml:"cloudflare,omitempty,omitzero"`
-	Namecheap  *providers.NamecheapConfig  `yaml:"namecheap,omitempty,omitzero"`
-	Porkbun    *providers.PorkbunConfig    `yaml:"porkbun,omitempty,omitzero"`
-	GoDaddy    *providers.GoDaddyConfig    `yaml:"godaddy,omitempty,omitzero"`
+	Cloudflare    *providers.CloudflareConfig    `yaml:"cloudflare,omitempty,omitzero"`
+	Namecheap     *providers.NamecheapConfig     `yaml:"namecheap,omitempty,omitzero"`
+	Porkbun       *providers.PorkbunConfig       `yaml:"porkbun,omitempty,omitzero"`
+	GoDaddy       *providers.GoDaddyConfig       `yaml:"godaddy,omitempty,omitzero"`
+	TheLittleHost *providers.TheLittleHostConfig  `yaml:"thelittlehost,omitempty,omitzero"`
 }
 
 // ManagementConfig holds domain management settings
@@ -148,6 +149,13 @@ func (c *Config) ValidateConfig() []string {
 		}
 	}
 
+	// Validate The Little Host config if present
+	if tlh := c.Providers.TheLittleHost; tlh != nil {
+		if tlh.APIKey == "" {
+			errors = append(errors, "TheLittleHost: api_key is required")
+		}
+	}
+
 	return errors
 }
 
@@ -166,6 +174,9 @@ func (c *Config) GetEnabledProviders() []string {
 	}
 	if c.Providers.GoDaddy != nil && c.Providers.GoDaddy.Enabled {
 		enabled = append(enabled, "godaddy")
+	}
+	if c.Providers.TheLittleHost != nil && c.Providers.TheLittleHost.Enabled {
+		enabled = append(enabled, "thelittlehost")
 	}
 
 	return enabled

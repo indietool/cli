@@ -28,10 +28,11 @@ type Registry struct {
 }
 
 type Providers struct {
-	Cloudflare *providers.CloudflareProvider
-	Porkbun    *providers.PorkbunProvider
-	Namecheap  *providers.NamecheapProvider
-	GoDaddy    *providers.GoDaddyProvider
+	Cloudflare    *providers.CloudflareProvider
+	Porkbun       *providers.PorkbunProvider
+	Namecheap     *providers.NamecheapProvider
+	GoDaddy       *providers.GoDaddyProvider
+	TheLittleHost *providers.TheLittleHostProvider
 }
 
 func GetProviders[T any](registry *Registry) []T {
@@ -77,6 +78,10 @@ func NewRegistry(cfg *Config) (*Registry, error) {
 		registry.providers.GoDaddy = providers.NewGoDaddy(*cfg.Providers.GoDaddy)
 	}
 
+	if cfg.Providers.TheLittleHost != nil {
+		registry.providers.TheLittleHost = providers.NewTheLittleHost(*cfg.Providers.TheLittleHost)
+	}
+
 	return registry, nil
 }
 
@@ -95,6 +100,9 @@ func (r *Registry) List() []string {
 	}
 	if r.providers.GoDaddy != nil {
 		names = append(names, "godaddy")
+	}
+	if r.providers.TheLittleHost != nil {
+		names = append(names, "thelittlehost")
 	}
 
 	return names
@@ -119,6 +127,10 @@ func (r *Registry) Get(name string) (Provider, bool) {
 		if r.providers.GoDaddy != nil {
 			return r.providers.GoDaddy, true
 		}
+	case "thelittlehost":
+		if r.providers.TheLittleHost != nil {
+			return r.providers.TheLittleHost, true
+		}
 	}
 	return nil, false
 }
@@ -138,6 +150,9 @@ func (r *Registry) GetEnabledProviders() []Provider {
 	}
 	if r.providers.GoDaddy != nil && r.providers.GoDaddy.IsEnabled() {
 		enabled = append(enabled, r.providers.GoDaddy)
+	}
+	if r.providers.TheLittleHost != nil && r.providers.TheLittleHost.IsEnabled() {
+		enabled = append(enabled, r.providers.TheLittleHost)
 	}
 
 	return enabled
