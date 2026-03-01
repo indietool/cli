@@ -107,7 +107,7 @@ func init() {
 	domainsCmd.AddCommand(listCmd)
 
 	// Filtering flags
-	listCmd.Flags().StringVar(&listProviderFilter, "provider", "", "Filter by provider (cloudflare, namecheap, porkbun, godaddy)")
+	listCmd.Flags().StringVar(&listProviderFilter, "provider", "", "Filter by provider (cloudflare, namecheap, porkbun, godaddy, thelittlehost)")
 	listCmd.Flags().StringVar(&listExpiringIn, "expiring-in", "", "Show domains expiring within timeframe (e.g., 30d, 1w)")
 	listCmd.Flags().StringVar(&listStatus, "status", "", "Filter by status (healthy, warning, critical, expired)")
 

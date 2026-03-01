@@ -202,6 +202,12 @@ func initProviderRegistry(cfg *indietool.Config) {
 			enabledCount++
 		}
 	}
+	if cfg.Providers.TheLittleHost != nil {
+		configuredCount++
+		if cfg.Providers.TheLittleHost.Enabled {
+			enabledCount++
+		}
+	}
 
 	if configuredCount > 0 {
 		log.Debugf("Configured %d provider(s)", configuredCount)

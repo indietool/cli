@@ -11,7 +11,7 @@ import (
 var domainsCmd = &cobra.Command{
 	Use:   "domains",
 	Short: "Manage domains across multiple registrars",
-	Long: `Manage your domains across multiple registrars including Cloudflare, Namecheap, Porkbun, and GoDaddy.
+	Long: `Manage your domains across multiple registrars including Cloudflare, Namecheap, Porkbun, GoDaddy, and The Little Host.
 Provides unified view of domain expiry, auto-renewal status, and nameserver configuration.
 
 Examples:

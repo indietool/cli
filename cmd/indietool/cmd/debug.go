@@ -107,6 +107,13 @@ var debugCmd = &cobra.Command{
 			} else {
 				fmt.Printf("  GoDaddy: not configured\n")
 			}
+
+			if tlh := config.Providers.TheLittleHost; tlh != nil {
+				fmt.Printf("  TheLittleHost: enabled=%v, has_key=%v, base_url=%s\n",
+					tlh.Enabled, tlh.APIKey != "", tlh.BaseURL)
+			} else {
+				fmt.Printf("  TheLittleHost: not configured\n")
+			}
 		} else {
 			fmt.Println("Provider Configurations: none (config invalid)")
 		}

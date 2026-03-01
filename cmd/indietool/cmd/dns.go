@@ -73,7 +73,7 @@ func init() {
 	rootCmd.AddCommand(dnsCmd)
 
 	// Consolidated DNS flags (persistent across all DNS subcommands)
-	dnsCmd.PersistentFlags().StringVar(&dnsProvider, "provider", "", "DNS provider to use (cloudflare, namecheap, porkbun, godaddy)")
+	dnsCmd.PersistentFlags().StringVar(&dnsProvider, "provider", "", "DNS provider to use (cloudflare, namecheap, porkbun, godaddy, thelittlehost)")
 	dnsCmd.PersistentFlags().BoolVarP(&dnsWideOutput, "wide", "w", false, "Show additional columns (ID, TTL, Priority)")
 	dnsCmd.PersistentFlags().BoolVar(&dnsNoHeaders, "no-headers", false, "Don't show column headers")
 	dnsCmd.PersistentFlags().BoolVar(&dnsNoColor, "no-color", false, "Disable colored output")

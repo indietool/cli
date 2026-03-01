@@ -95,7 +95,7 @@ func init() {
 	dnsCmd.AddCommand(dnsSetCmd)
 
 	// Provider flag
-	dnsSetCmd.Flags().StringVar(&dnsSetProvider, "provider", "", "DNS provider to use (cloudflare, namecheap, porkbun, godaddy)")
+	dnsSetCmd.Flags().StringVar(&dnsSetProvider, "provider", "", "DNS provider to use (cloudflare, namecheap, porkbun, godaddy, thelittlehost)")
 
 	// DNS record options
 	dnsSetCmd.Flags().IntVar(&dnsSetTTL, "ttl", 300, "TTL (Time To Live) in seconds")

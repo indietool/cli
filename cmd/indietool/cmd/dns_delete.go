@@ -38,7 +38,7 @@ Examples:
 }
 
 func init() {
-	dnsDeleteCmd.Flags().StringVar(&dnsDeleteProvider, "provider", "", "DNS provider to use (cloudflare, namecheap, porkbun, godaddy)")
+	dnsDeleteCmd.Flags().StringVar(&dnsDeleteProvider, "provider", "", "DNS provider to use (cloudflare, namecheap, porkbun, godaddy, thelittlehost)")
 	dnsDeleteCmd.Flags().BoolVarP(&dnsDeleteForce, "force", "f", false, "Delete without confirmation")
 	dnsDeleteCmd.Flags().StringVar(&dnsDeleteType, "type", "", "Record type filter")
 	dnsDeleteCmd.Flags().StringVar(&dnsDeleteID, "id", "", "Record ID to delete (use with --wide to find IDs)")
