@@ -71,23 +71,24 @@ Examples:
 			return
 		}
 
-		// Log detection result for debugging
+		// Resolve provider name from flag or detection
+		resolvedProvider := dnsSetProvider
 		if detectionResult != nil {
 			if detectionResult.Provider != "" {
 				log.Debugf("Used DNS provider: %s (confidence: %s)", detectionResult.Provider, detectionResult.Confidence)
+				if resolvedProvider == "" {
+					resolvedProvider = detectionResult.Provider
+				}
 			} else {
 				log.Debugf("Failed to detect DNS provider: %s", detectionResult.Error)
 			}
 		}
 
 		// Success message
-		if dnsSetProvider != "" {
-			fmt.Printf("Successfully set DNS record %s %s %s via %s\n", name, recordType, value, dnsSetProvider)
-		} else if detectionResult != nil && detectionResult.Provider != "" {
-			fmt.Printf("Successfully set DNS record %s %s %s via %s\n", name, recordType, value, detectionResult.Provider)
-		} else {
-			fmt.Printf("Successfully set DNS record %s %s %s\n", name, recordType, value)
+		if resolvedProvider != "" {
+			fmt.Printf("DNS Provider: %s\n", resolvedProvider)
 		}
+		fmt.Printf("Successfully set DNS record %s %s %s\n", name, recordType, value)
 	},
 }
 

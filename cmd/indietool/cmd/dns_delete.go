@@ -62,9 +62,14 @@ func runDNSDelete(cmd *cobra.Command, args []string) error {
 	log.Debugf("Deleting DNS records for domain=%s, name=%s, type=%s, id=%s", domain, name, recordType, dnsDeleteID)
 
 	// Find records to delete
-	recordsToDelete, err := findRecordsForDeletion(domain, name, recordType, dnsDeleteID)
+	recordsToDelete, resolvedProvider, err := findRecordsForDeletion(domain, name, recordType, dnsDeleteID)
 	if err != nil {
 		return err
+	}
+
+	// Show DNS provider
+	if resolvedProvider != "" {
+		fmt.Printf("DNS Provider: %s\n", resolvedProvider)
 	}
 
 	if len(recordsToDelete) == 0 {
@@ -96,17 +101,17 @@ func runDNSDelete(cmd *cobra.Command, args []string) error {
 	return executeDeletions(domain, recordsToDelete)
 }
 
-func findRecordsForDeletion(domain, name, recordType, recordID string) ([]dns.Record, error) {
+func findRecordsForDeletion(domain, name, recordType, recordID string) ([]dns.Record, string, error) {
 	// Get the global provider registry
 	registry := GetProviderRegistry()
 	if registry == nil {
-		return nil, fmt.Errorf("provider registry not initialized")
+		return nil, "", fmt.Errorf("provider registry not initialized")
 	}
 
 	// Get DNS providers from registry
 	dnsProviders := indietool.GetProviders[dns.Provider](registry)
 	if len(dnsProviders) == 0 {
-		return nil, fmt.Errorf("no DNS providers configured")
+		return nil, "", fmt.Errorf("no DNS providers configured")
 	}
 
 	// Create DNS manager
@@ -115,13 +120,17 @@ func findRecordsForDeletion(domain, name, recordType, recordID string) ([]dns.Re
 	// List all records for the domain
 	records, detectionResult, err := manager.ListRecords(context.Background(), domain, dnsDeleteProvider)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list DNS records: %w", err)
+		return nil, "", fmt.Errorf("failed to list DNS records: %w", err)
 	}
 
-	// Log detection result for debugging
+	// Resolve provider name from flag or detection
+	resolvedProvider := dnsDeleteProvider
 	if detectionResult != nil {
 		if detectionResult.Provider != "" {
 			log.Debugf("Detected DNS provider: %s (confidence: %s)", detectionResult.Provider, detectionResult.Confidence)
+			if resolvedProvider == "" {
+				resolvedProvider = detectionResult.Provider
+			}
 		} else {
 			log.Debugf("Failed to detect DNS provider: %s", detectionResult.Error)
 		}
@@ -148,7 +157,7 @@ func findRecordsForDeletion(domain, name, recordType, recordID string) ([]dns.Re
 		matches = append(matches, record)
 	}
 
-	return matches, nil
+	return matches, resolvedProvider, nil
 }
 
 func confirmDeletion(records []dns.Record) bool {

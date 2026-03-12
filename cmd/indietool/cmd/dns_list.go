@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"indietool/cli/dns"
 	"indietool/cli/output"
@@ -41,22 +42,30 @@ Examples:
 			return
 		}
 
-		// Log detection result for debugging
+		// Resolve provider name from flag or detection
+		resolvedProvider := GetDNSProvider()
 		if detectionResult != nil {
 			if detectionResult.Provider != "" {
 				log.Debugf("Detected DNS provider: %s (confidence: %s)", detectionResult.Provider, detectionResult.Confidence)
+				if resolvedProvider == "" {
+					resolvedProvider = detectionResult.Provider
+				}
 			} else {
 				log.Debugf("Failed to detect DNS provider: %s", detectionResult.Error)
 			}
 		}
 
 		// Output records
-		// if jsonOutput {
-		// 	output.PrintJSON(map[string]interface{}{"records": records})
-		// } else {
-		// 	outputDNSRecordsTable(records, domain)
-		// }
-		outputDNSRecordsTable(records, domain)
+		if jsonOutput {
+			data, _ := json.MarshalIndent(map[string]interface{}{
+				"domain":   domain,
+				"provider": resolvedProvider,
+				"records":  records,
+			}, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			outputDNSRecordsTable(records, domain, resolvedProvider)
+		}
 	},
 }
 
@@ -65,7 +74,7 @@ func init() {
 	// Flags are now handled by parent dns command
 }
 
-func outputDNSRecordsTable(records []dns.Record, domain string) {
+func outputDNSRecordsTable(records []dns.Record, domain string, provider string) {
 	if len(records) == 0 {
 		fmt.Printf("No DNS records found for domain: %s\n", domain)
 		return
@@ -139,7 +148,11 @@ func outputDNSRecordsTable(records []dns.Record, domain string) {
 
 	// Show summary
 	if !noHeaders {
-		fmt.Printf("\nDNS Records for %s (%d total)\n\n", domain, len(records))
+		fmt.Printf("\nDNS Records for %s (%d total)\n", domain, len(records))
+		if provider != "" {
+			fmt.Printf("DNS Provider: %s\n", provider)
+		}
+		fmt.Println()
 	}
 
 	if err := table.Render(); err != nil {
