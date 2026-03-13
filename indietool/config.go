@@ -201,6 +201,13 @@ func (c *Config) GetSecretsConfig() *secrets.Config {
 		c.Secrets.StorageDir = c.getSecretsDir()
 	}
 
+	if c.Secrets.SSHPublicKeyPath == "" {
+		c.Secrets.SSHPublicKeyPath = "~/.ssh/id_ed25519.pub"
+	}
+	if c.Secrets.SSHPrivateKeyPath == "" {
+		c.Secrets.SSHPrivateKeyPath = "~/.ssh/id_ed25519"
+	}
+
 	return &c.Secrets
 }
 

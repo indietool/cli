@@ -27,10 +27,13 @@ type SecretListItem struct {
 
 // Config represents the secrets configuration
 type Config struct {
-	DefaultDatabase string `yaml:"default_database"`
-	StorageDir      string `yaml:"storage_dir"`
-	ClipboardTTL    int    `yaml:"clipboard_ttl_seconds"`
-	MaskOutput      bool   `yaml:"output_masked"`
+	DefaultDatabase  string `yaml:"default_database"`
+	StorageDir       string `yaml:"storage_dir"`
+	ClipboardTTL     int    `yaml:"clipboard_ttl_seconds"`
+	MaskOutput       bool   `yaml:"output_masked"`
+	KeyBackend       string `yaml:"key_backend,omitempty"`          // "keyring", "age-ssh", or "" (auto)
+	SSHPublicKeyPath string `yaml:"ssh_public_key_path,omitempty"`  // default: ~/.ssh/id_ed25519.pub
+	SSHPrivateKeyPath string `yaml:"ssh_private_key_path,omitempty"` // default: ~/.ssh/id_ed25519
 }
 
 // ParseSecretIdentifier parses name[@database] syntax and returns the components

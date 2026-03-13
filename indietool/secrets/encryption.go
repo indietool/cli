@@ -6,26 +6,38 @@ import (
 	"os"
 
 	"filippo.io/age"
-	"github.com/zalando/go-keyring"
-)
-
-const (
-	KeyringService = "indietool-secrets"
 )
 
 // Encryptor handles encryption and decryption of secrets using age
-type Encryptor struct{}
+type Encryptor struct {
+	config *Config
+}
 
 // NewEncryptor creates a new encryptor instance
-func NewEncryptor() (*Encryptor, error) {
-	return &Encryptor{}, nil
+func NewEncryptor(config *Config) (*Encryptor, error) {
+	return &Encryptor{config: config}, nil
+}
+
+// getBackends returns the backends to use based on config
+func (e *Encryptor) getBackends() []KeyBackend {
+	switch e.config.KeyBackend {
+	case "keyring":
+		return []KeyBackend{&KeyringBackend{}}
+	case "age-ssh":
+		return []KeyBackend{&AgeSSHBackend{config: e.config}}
+	default:
+		return []KeyBackend{&KeyringBackend{}, &AgeSSHBackend{config: e.config}}
+	}
 }
 
 // HasKey checks if an encryption key already exists for the specified database
 func (e *Encryptor) HasKey(database string) bool {
-	keyName := fmt.Sprintf("db-key-%s", database)
-	_, err := keyring.Get(KeyringService, keyName)
-	return err == nil
+	for _, b := range e.getBackends() {
+		if b.HasKey(database) {
+			return true
+		}
+	}
+	return false
 }
 
 // InitializeKey initializes or loads an encryption key for the specified database
@@ -52,11 +64,26 @@ func (e *Encryptor) InitializeKey(database, keyPath string) error {
 		}
 	}
 
-	// Store in keyring using zalando/go-keyring
-	keyName := fmt.Sprintf("db-key-%s", database)
-	err = keyring.Set(KeyringService, keyName, identity.String())
-	if err != nil {
-		return fmt.Errorf("failed to store key in keyring: %w", err)
+	keyStr := identity.String()
+
+	switch e.config.KeyBackend {
+	case "keyring":
+		if err := (&KeyringBackend{}).SetKey(database, keyStr); err != nil {
+			return fmt.Errorf("failed to store key in keyring: %w", err)
+		}
+	case "age-ssh":
+		if err := (&AgeSSHBackend{config: e.config}).SetKey(database, keyStr); err != nil {
+			return fmt.Errorf("failed to store key via age-ssh backend: %w", err)
+		}
+	default:
+		// auto: try keyring first, fall back to age-ssh
+		if err := (&KeyringBackend{}).SetKey(database, keyStr); err != nil {
+			ab := &AgeSSHBackend{config: e.config}
+			if err2 := ab.SetKey(database, keyStr); err2 != nil {
+				return fmt.Errorf("failed to store key (keyring: %v; age-ssh: %v)", err, err2)
+			}
+			fmt.Fprintf(os.Stderr, "⚠ Keyring unavailable, falling back to age-ssh backend.\n  Run 'indietool secrets init --backend age-ssh' to make this permanent.\n")
+		}
 	}
 
 	return nil
@@ -64,18 +91,26 @@ func (e *Encryptor) InitializeKey(database, keyPath string) error {
 
 // getIdentity retrieves the encryption identity for the specified database
 func (e *Encryptor) getIdentity(database string) (*age.X25519Identity, error) {
-	keyName := fmt.Sprintf("db-key-%s", database)
-	keyData, err := keyring.Get(KeyringService, keyName)
-	if err != nil {
-		return nil, fmt.Errorf("encryption key not found for database '%s'", database)
+	var lastErr error
+	for _, b := range e.getBackends() {
+		if b.HasKey(database) {
+			keyStr, err := b.GetKey(database)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			identity, err := age.ParseX25519Identity(keyStr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse stored key: %w", err)
+			}
+			return identity, nil
+		}
 	}
 
-	identity, err := age.ParseX25519Identity(keyData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse stored key: %w", err)
+	if lastErr != nil {
+		return nil, lastErr
 	}
-
-	return identity, nil
+	return nil, fmt.Errorf("encryption key not found for database '%s'", database)
 }
 
 // Encrypt encrypts data using the key for the specified database

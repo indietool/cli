@@ -18,6 +18,8 @@ require (
 	github.com/zalando/go-keyring v0.2.6
 )
 
+require filippo.io/edwards25519 v1.0.0 // indirect
+
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
@@ -59,7 +61,7 @@ require (
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.opencensus.io v0.22.5 // indirect
-	golang.org/x/crypto v0.17.0 // indirect
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect

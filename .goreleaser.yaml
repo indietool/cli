@@ -130,6 +130,9 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TOKEN }}"
 
+    directory: Formula
+    license: Apache 2
+
     # Package info
     homepage: https://github.com/indietool/cli
     description: "An all-in-one tool for unified infrastructure management"

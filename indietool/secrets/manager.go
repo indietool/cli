@@ -20,7 +20,7 @@ func NewManager(config *Config) (*Manager, error) {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
-	encryptor, err := NewEncryptor()
+	encryptor, err := NewEncryptor(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize encryptor: %w", err)
 	}

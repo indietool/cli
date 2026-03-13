@@ -16,6 +16,12 @@ var secretsInitCmd = &cobra.Command{
 	RunE:  initSecrets,
 }
 
+func init() {
+	secretsInitCmd.Flags().String("backend", "", `Key storage backend: "keyring" or "age-ssh" (default: auto-detect)`)
+	secretsInitCmd.Flags().String("ssh-public-key", "", "Path to SSH public key for age-ssh backend")
+	secretsInitCmd.Flags().String("ssh-private-key", "", "Path to SSH private key for age-ssh backend")
+}
+
 func initSecrets(cmd *cobra.Command, args []string) error {
 	cfg := GetConfig()
 	if cfg == nil {
@@ -27,8 +33,27 @@ func initSecrets(cmd *cobra.Command, args []string) error {
 		keyPath = strings.TrimSpace(args[0])
 	}
 
+	backend, _ := cmd.Flags().GetString("backend")
+	if backend != "" && backend != "keyring" && backend != "age-ssh" {
+		return fmt.Errorf("invalid backend %q: must be \"keyring\" or \"age-ssh\"", backend)
+	}
+
+	sshPublicKey, _ := cmd.Flags().GetString("ssh-public-key")
+	sshPrivateKey, _ := cmd.Flags().GetString("ssh-private-key")
+
 	// Get secrets config with defaults
 	secretsConfig := cfg.GetSecretsConfig()
+
+	if sshPublicKey != "" {
+		secretsConfig.SSHPublicKeyPath = sshPublicKey
+	}
+	if sshPrivateKey != "" {
+		secretsConfig.SSHPrivateKeyPath = sshPrivateKey
+	}
+	if backend != "" {
+		secretsConfig.KeyBackend = backend
+	}
+
 	database := secretsConfig.GetDefaultDatabase()
 
 	manager, err := secrets.NewManager(secretsConfig)
@@ -49,10 +74,37 @@ func initSecrets(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	if keyPath != "" {
-		fmt.Printf("✓ Encryption key loaded from '%s' for database '%s'\n", keyPath, database)
-	} else {
-		fmt.Printf("✓ New encryption key generated for database '%s'\n", database)
+	// If backend was explicitly set, persist it to config
+	if backend != "" {
+		cfg.Secrets.KeyBackend = backend
+		if sshPublicKey != "" {
+			cfg.Secrets.SSHPublicKeyPath = sshPublicKey
+		}
+		if sshPrivateKey != "" {
+			cfg.Secrets.SSHPrivateKeyPath = sshPrivateKey
+		}
+		if err := cfg.SaveConfig(cfg.Path); err != nil {
+			fmt.Printf("⚠ Failed to save backend preference to config: %v\n", err)
+		} else {
+			fmt.Printf("✓ Backend '%s' recorded in config\n", backend)
+		}
+	}
+
+	switch backend {
+	case "age-ssh":
+		fmt.Printf("✓ Encryption key stored as age-ssh file (SSH key: %s)\n", secretsConfig.SSHPublicKeyPath)
+	case "keyring":
+		if keyPath != "" {
+			fmt.Printf("✓ Encryption key loaded from '%s' for database '%s'\n", keyPath, database)
+		} else {
+			fmt.Printf("✓ New encryption key generated for database '%s'\n", database)
+		}
+	default:
+		if keyPath != "" {
+			fmt.Printf("✓ Encryption key loaded from '%s' for database '%s'\n", keyPath, database)
+		} else {
+			fmt.Printf("✓ New encryption key generated for database '%s'\n", database)
+		}
 	}
 
 	return nil
