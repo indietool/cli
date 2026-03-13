@@ -74,7 +74,7 @@ nfpms:
       secrets, DNS, and more across multiple providers.
 
     # Maintainer info
-    maintainer: indietool <hello@indietool.com>
+    maintainer: indietool <hello@indietool.dev>
     license: Apache 2
 
     # Binary location
@@ -129,9 +129,6 @@ brews:
       owner: indietool
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TOKEN }}"
-
-    directory: Formula
-    license: Apache 2
 
     # Package info
     homepage: https://github.com/indietool/cli
