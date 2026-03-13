@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -71,7 +72,19 @@ func initSecrets(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := manager.InitDatabase(database, keyPath); err != nil {
-		return fmt.Errorf("failed to initialize database: %w", err)
+		var keyringErr *secrets.ErrKeyringUnavailable
+		if errors.As(err, &keyringErr) {
+			if resolveErr := resolveKeyBackend(secretsConfig, keyringErr); resolveErr != nil {
+				return resolveErr
+			}
+			// Treat the interactively-resolved age-ssh backend as an explicit choice
+			// so config is saved and the correct success message is printed below.
+			backend = "age-ssh"
+			err = manager.InitDatabase(database, keyPath)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to initialize database: %w", err)
+		}
 	}
 
 	// If backend was explicitly set, persist it to config

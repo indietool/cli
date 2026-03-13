@@ -4,9 +4,27 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"filippo.io/age"
 )
+
+// ErrKeyringUnavailable is returned by InitializeKey (auto mode) when the system
+// keyring cannot be accessed. It carries enough context for the caller to present
+// an SSH key selection UI and then retry with the chosen key.
+type ErrKeyringUnavailable struct {
+	Cause         error    // underlying keyring error
+	DefaultPubKey string   // configured SSH pub key path (may use ~)
+	DefaultExists bool     // whether DefaultPubKey exists on disk
+	AvailableKeys []string // .pub files found in ~/.ssh/ (tilde-prefixed)
+}
+
+func (e *ErrKeyringUnavailable) Error() string {
+	return fmt.Sprintf("system keyring unavailable: %v", e.Cause)
+}
+
+func (e *ErrKeyringUnavailable) Unwrap() error { return e.Cause }
 
 // Encryptor handles encryption and decryption of secrets using age
 type Encryptor struct {
@@ -76,13 +94,29 @@ func (e *Encryptor) InitializeKey(database, keyPath string) error {
 			return fmt.Errorf("failed to store key via age-ssh backend: %w", err)
 		}
 	default:
-		// auto: try keyring first, fall back to age-ssh
-		if err := (&KeyringBackend{}).SetKey(database, keyStr); err != nil {
-			ab := &AgeSSHBackend{config: e.config}
-			if err2 := ab.SetKey(database, keyStr); err2 != nil {
-				return fmt.Errorf("failed to store key (keyring: %v; age-ssh: %v)", err, err2)
+		// auto: try keyring first; if unavailable, surface a typed error so the
+		// caller (cmd layer) can present a backend-selection UI and retry.
+		if keyringErr := (&KeyringBackend{}).SetKey(database, keyStr); keyringErr != nil {
+			defaultPub := e.config.SSHPublicKeyPath
+			_, statErr := os.Stat(expandPath(defaultPub))
+			defaultExists := statErr == nil
+
+			homeDir, _ := os.UserHomeDir()
+			var availableKeys []string
+			if entries, err := os.ReadDir(filepath.Join(homeDir, ".ssh")); err == nil {
+				for _, entry := range entries {
+					if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".pub") {
+						availableKeys = append(availableKeys, "~/.ssh/"+entry.Name())
+					}
+				}
 			}
-			fmt.Fprintf(os.Stderr, "⚠ Keyring unavailable, falling back to age-ssh backend.\n  Run 'indietool secrets init --backend age-ssh' to make this permanent.\n")
+
+			return &ErrKeyringUnavailable{
+				Cause:         keyringErr,
+				DefaultPubKey: defaultPub,
+				DefaultExists: defaultExists,
+				AvailableKeys: availableKeys,
+			}
 		}
 	}
 

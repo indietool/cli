@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -65,7 +67,18 @@ func setSecret(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := manager.SetSecret(name, value, database, note, expiresAt); err != nil {
-		return fmt.Errorf("failed to store secret: %w", err)
+		var keyringErr *secrets.ErrKeyringUnavailable
+		if errors.As(err, &keyringErr) {
+			if resolveErr := resolveKeyBackend(secretsConfig, keyringErr); resolveErr != nil {
+				return resolveErr
+			}
+			fmt.Fprintln(os.Stderr, "⚠  Using age-ssh for this session. Run 'indietool secrets init --backend age-ssh' to make this permanent.")
+			fmt.Fprintln(os.Stderr)
+			err = manager.SetSecret(name, value, database, note, expiresAt)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to store secret: %w", err)
+		}
 	}
 
 	fmt.Printf("✓ Secret '%s' stored successfully", name)
