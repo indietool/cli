@@ -7,7 +7,7 @@ Tired of bouncing between registrars, tracking domain renewals in spreadsheets, 
 - 🌍 Hunt domain names across 50+ TLDs — in seconds
 - 🗓️ Track expiries across registrars like Cloudflare & Porkbun
 - ☁️ Manage DNS records across providers with auto-detection
-- 🔐 Securely store API keys & secrets using your OS keyring
+- 🔐 Securely store API keys & secrets — OS keyring or SSH-key encrypted
 
 No dashboards. No vendor lock-in. Just you and your terminal.
 
@@ -144,6 +144,9 @@ indietool config add provider cloudflare \
 indietool config add provider porkbun \
   --api-key YOUR_KEY \
   --api-secret YOUR_SECRET
+
+# The Little Host (DNS only)
+indietool config add provider thelittlehost --api-key tlh_YOUR_API_KEY
 ```
 
 Then list your domains:
@@ -185,6 +188,7 @@ indietool dns list example.com
 ```
 
 ```
+DNS Provider: cloudflare
 TYPE  NAME     CONTENT
 A     ☁️@      192.168.1.1
 A     www      192.168.1.2
@@ -257,6 +261,7 @@ indietool dns delete example.com old-record A --provider namecheap
 - ✅ **Cloudflare** - Full CRUD operations with proxy status indicators
 - ✅ **Porkbun** - Complete DNS record management (list, set, delete)
 - ✅ **Namecheap** - Full CRUD support with batch operations
+- ✅ **The Little Host** - Full DNS record management
 
 #### Auto-detection
 
@@ -275,10 +280,33 @@ indietool dns delete example.com old-record A --provider namecheap
 
 #### How it works
 
-| Component        | Stored At                                | Encrypted |
-| ---------------- | ---------------------------------------- | --------- |
-| Secrets Database | `~/.config/indietool/secrets/`           | ✅        |
-| Encryption Key   | OS Keyring (`Keychain`, `gnome-keyring`) | ✅        |
+| Component             | Backend   | Stored At                                        | Encrypted |
+| --------------------- | --------- | ------------------------------------------------ | --------- |
+| Secrets Database      | both      | `~/.config/indietool/secrets/`                   | ✅        |
+| Encryption Key        | keyring   | OS Keyring (`Keychain`, `gnome-keyring`)          | ✅        |
+| Encryption Key        | age-ssh   | `~/.config/indietool/keys/db-key-<database>.age` | ✅        |
+
+`indietool` supports two backends for storing the database encryption key:
+
+- **keyring** (default) — uses your OS keyring. Works well for desktop sessions.
+- **age-ssh** (recommended for servers / SSH sessions) — encrypts the key with your SSH public key and stores it as a file. Decryption uses your SSH private key or agent.
+
+#### Choose a backend
+
+```bash
+# Explicit initialization with age-ssh (recommended for remote hosts)
+indietool secrets init --backend age-ssh
+
+# Specify a custom SSH key pair
+indietool secrets init --backend age-ssh \
+  --ssh-public-key ~/.ssh/id_rsa.pub \
+  --ssh-private-key ~/.ssh/id_rsa
+
+# Explicit initialization using the OS keyring
+indietool secrets init --backend keyring
+```
+
+If `indietool` detects that the keyring is unavailable (e.g. in an SSH session), it will guide you through selecting an SSH key automatically on first use.
 
 #### Store a secret (auto-initializes encryption)
 
@@ -363,13 +391,14 @@ export STRIPE_KEY=$(indietool secret get stripe-key -S)
 
 ### ❓ Which providers are supported?
 
-| Provider   | Domains | DNS | Secrets |
-| ---------- | ------- | --- | ------- |
-| Cloudflare | ✅      | ✅  | ❌      |
-| Porkbun    | ✅      | ✅  | ❌      |
-| Namecheap  | ✅      | ✅  | ❌      |
-| GoDaddy    | ✅      | ❌  | ❌      |
-| Local      | ❌      | ❌  | ✅      |
+| Provider        | Domains | DNS | Secrets |
+| --------------- | ------- | --- | ------- |
+| Cloudflare      | ✅      | ✅  | ❌      |
+| Porkbun         | ✅      | ✅  | ❌      |
+| Namecheap       | ✅      | ✅  | ❌      |
+| GoDaddy         | ✅      | ❌  | ❌      |
+| The Little Host | ❌      | ✅  | ❌      |
+| Local           | ❌      | ❌  | ✅      |
 
 **Legend:**
 
@@ -381,19 +410,19 @@ export STRIPE_KEY=$(indietool secret get stripe-key -S)
 
 - **Domains**: Domain registration management, expiry tracking, nameserver updates
 - **DNS**: DNS record management (list, create, update, delete) with ID-based targeting
-- **Secrets**: Local encrypted secret storage using OS keyring
+- **Secrets**: Local encrypted secret storage (OS keyring or age-ssh backend)
 
 ---
 
 ### ❓ Where are my secrets stored?
 
-Encrypted locally at `~/.config/indietool/secrets/`, using an encryption key stored in your OS keyring.
+Encrypted locally at `~/.config/indietool/secrets/`. The encryption key is stored in your OS keyring (default) or as an age-encrypted file at `~/.config/indietool/keys/` when using the age-ssh backend.
 
 ---
 
 ### ❓ What if I lose my computer?
 
-Secrets are useless without your OS user account + keyring. Just start storing secrets on your new machine - no manual initialization needed.
+Secrets are useless without your encryption key. With the default keyring backend, start fresh on the new machine. With the age-ssh backend, your key file (`~/.config/indietool/keys/`) and SSH private key are both required — back up the keys directory if you need portability.
 
 ---
 
@@ -410,6 +439,21 @@ Not yet — currently macOS and Linux only. Windows support is planned.
 - Ensure your keyring (Keychain or gnome-keyring) is unlocked
 - Check file permissions on `~/.config/indietool/secrets/`
 
+### Secrets not working in SSH sessions?
+
+GUI keyrings like GNOME Keyring require a graphical session to unlock, so they fail over SSH. Use the age-ssh backend instead:
+
+```bash
+indietool secrets init --backend age-ssh
+```
+
+This encrypts the database key with your SSH public key. To decrypt over SSH, connect with agent forwarding enabled:
+
+```bash
+ssh -A yourserver.example.com
+# or add 'ForwardAgent yes' to your ~/.ssh/config
+```
+
 ### "Permission denied" errors?
 
 - Check file permissions on `~/.config/indietool`
@@ -425,10 +469,10 @@ Not yet — currently macOS and Linux only. Windows support is planned.
 ## 🚫 Limitations
 
 - ❌ No Windows support (yet)
-- 🧩 Only supports a few registrars (Cloudflare, Porkbun, Namecheap, Godaddy)
+- 🧩 Registrar support: Cloudflare, Porkbun, Namecheap, GoDaddy
 - ☁️ DNS management: GoDaddy implementation in progress
 - 💻 CLI only — no web UI or GUI planned
-- 🔄 Secrets not synced across machines (by design)
+- 🔄 Secrets not synced across machines (by design — use age-ssh for cross-host access via SSH agent forwarding)
 
 ---
 
