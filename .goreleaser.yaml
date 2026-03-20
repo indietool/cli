@@ -75,7 +75,7 @@ nfpms:
 
     # Maintainer info
     maintainer: indietool <hello@indietool.dev>
-    license: Apache 2
+    license: Apache-2.0
 
     # Binary location
     bindir: /usr/bin
@@ -129,11 +129,12 @@ brews:
       owner: indietool
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TOKEN }}"
+    directory: Formula
 
     # Package info
     homepage: https://github.com/indietool/cli
     description: "An all-in-one tool for unified infrastructure management"
-    license: Apache 2
+    license: Apache-2.0
 
     # Dependencies
     dependencies:
