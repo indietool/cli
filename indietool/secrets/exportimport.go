@@ -34,7 +34,6 @@ func (m *Manager) ExportSecrets(spec map[string][]string) (*ExportData, error) {
 
 	for db, names := range spec {
 		if names == nil {
-			// Export the whole database
 			keys, err := m.storage.List(db)
 			if err != nil {
 				return nil, fmt.Errorf("failed to list secrets in database %q: %w", db, err)
@@ -54,6 +53,24 @@ func (m *Manager) ExportSecrets(spec map[string][]string) (*ExportData, error) {
 	}
 
 	return data, nil
+}
+
+// RenameDatabase copies all secrets from oldName into newName, then deletes oldName.
+// If force is false, halts if any secret in newName already exists.
+func (m *Manager) RenameDatabase(oldName, newName string, force bool) error {
+	data, err := m.ExportSecrets(map[string][]string{oldName: nil})
+	if err != nil {
+		return fmt.Errorf("failed to read database %q: %w", oldName, err)
+	}
+
+	data.Databases[newName] = data.Databases[oldName]
+	delete(data.Databases, oldName)
+
+	if _, _, err := m.ImportSecrets(data, force); err != nil {
+		return err
+	}
+
+	return m.DeleteDatabase(oldName)
 }
 
 // ImportSecrets imports secrets from ExportData into the local instance.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"filippo.io/age"
 	"github.com/spf13/cobra"
@@ -20,13 +21,18 @@ var secretsImportCmd = &cobra.Command{
 	Long: `Import secrets from a previously exported JSON file into the local instance.
 
 Encrypted exports are detected automatically and will prompt for a passphrase.
-Use --force to overwrite secrets that already exist locally.`,
+Use --force to overwrite secrets that already exist locally.
+
+Use --remap to redirect a source database to a different name on import:
+  --remap old:new          rename one database
+  --remap a:x --remap b:x  merge two databases into one`,
 	Args: cobra.ExactArgs(1),
 	RunE: importSecrets,
 }
 
 func init() {
 	secretsImportCmd.Flags().BoolP("force", "f", false, "Overwrite existing secrets")
+	secretsImportCmd.Flags().StringArrayP("remap", "r", nil, "Rename a database on import: old:new (repeatable)")
 }
 
 func importSecrets(cmd *cobra.Command, args []string) error {
@@ -36,6 +42,13 @@ func importSecrets(cmd *cobra.Command, args []string) error {
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
+	remapArgs, _ := cmd.Flags().GetStringArray("remap")
+
+	// Parse --remap old:new pairs
+	remap, err := parseRemap(remapArgs)
+	if err != nil {
+		return err
+	}
 
 	fileData, err := os.ReadFile(args[0])
 	if err != nil {
@@ -68,6 +81,19 @@ func importSecrets(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse import file: %w", err)
 	}
 
+	// Apply remaps: merge remapped entries, then replace the databases map
+	if len(remap) > 0 {
+		remapped := make(map[string][]*secrets.Secret, len(data.Databases))
+		for src, secretsList := range data.Databases {
+			dst := src
+			if target, ok := remap[src]; ok {
+				dst = target
+			}
+			remapped[dst] = append(remapped[dst], secretsList...)
+		}
+		data.Databases = remapped
+	}
+
 	secretsConfig := cfg.GetSecretsConfig()
 	manager, err := secrets.NewManager(secretsConfig)
 	if err != nil {
@@ -85,6 +111,19 @@ func importSecrets(cmd *cobra.Command, args []string) error {
 
 	printImportSummary(data.Databases, imported)
 	return nil
+}
+
+// parseRemap validates and parses --remap old:new flags into a lookup map.
+func parseRemap(args []string) (map[string]string, error) {
+	remap := make(map[string]string, len(args))
+	for _, arg := range args {
+		parts := strings.SplitN(arg, ":", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return nil, fmt.Errorf("invalid --remap value %q: expected old:new", arg)
+		}
+		remap[parts[0]] = parts[1]
+	}
+	return remap, nil
 }
 
 func printImportSummary(databases map[string][]*secrets.Secret, total int) {

@@ -14,4 +14,5 @@ func init() {
 	// Add subcommands to db command
 	secretsDbCmd.AddCommand(secretsDbListCmd)
 	secretsDbCmd.AddCommand(secretsDbDeleteCmd)
+	secretsDbCmd.AddCommand(secretsDbRenameCmd)
 }
