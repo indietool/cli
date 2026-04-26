@@ -47,4 +47,6 @@ func init() {
 	secretsCmd.AddCommand(secretsDbCmd)
 	secretsCmd.AddCommand(secretsExportCmd)
 	secretsCmd.AddCommand(secretsImportCmd)
+	secretsCmd.AddCommand(secretsShardCmd)
+	secretsCmd.AddCommand(secretsJoinCmd)
 }
