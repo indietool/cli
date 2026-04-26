@@ -18,7 +18,12 @@ require (
 	github.com/zalando/go-keyring v0.2.6
 )
 
-require filippo.io/edwards25519 v1.0.0 // indirect
+require (
+	filippo.io/edwards25519 v1.0.0 // indirect
+	github.com/rrivera/identicon v0.0.0-20240116195454-d5ba35832c0d // indirect
+	gopkg.in/urfave/cli.v2 v2.0.0-20190806201727-b62605953717 // indirect
+	moul.io/drunken-bishop v1.0.1 // indirect
+)
 
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
