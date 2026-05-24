@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/indietool/secrets"
 )
 
 var secretsShardCmd = &cobra.Command{

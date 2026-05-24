@@ -3,9 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"indietool/cli/domains"
-	"indietool/cli/indietool"
-	"indietool/cli/output"
+	"github.com/indietool/cli/domains"
+	"github.com/indietool/cli/indietool"
+	"github.com/indietool/cli/output"
 	"os"
 	"sort"
 	"sync"

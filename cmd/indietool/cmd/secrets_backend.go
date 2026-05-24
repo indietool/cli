@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/indietool/secrets"
 )
 
 // resolveKeyBackend handles an ErrKeyringUnavailable by printing an explanation

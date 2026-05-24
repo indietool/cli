@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"indietool/cli/config"
+	"github.com/indietool/cli/config"
 	"os"
 	"path/filepath"
 	"testing"

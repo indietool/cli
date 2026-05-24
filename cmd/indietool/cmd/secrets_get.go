@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/indietool/secrets"
 	"strings"
 
 	"github.com/spf13/cobra"

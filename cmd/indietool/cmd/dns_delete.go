@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"indietool/cli/dns"
-	"indietool/cli/indietool"
+	"github.com/indietool/cli/dns"
+	"github.com/indietool/cli/indietool"
 	"os"
 	"strings"
 

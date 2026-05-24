@@ -2,7 +2,7 @@ package domains
 
 import (
 	"fmt"
-	"indietool/cli/output"
+	"github.com/indietool/cli/output"
 	"io"
 	"sort"
 	"strings"

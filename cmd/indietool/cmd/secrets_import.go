@@ -9,7 +9,7 @@ import (
 
 	"filippo.io/age"
 	"github.com/spf13/cobra"
-	"indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/indietool/secrets"
 )
 
 // ageMagic is the header written by filippo.io/age for binary-format encrypted files.

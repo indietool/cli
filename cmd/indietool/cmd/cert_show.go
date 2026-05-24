@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	"indietool/cli/certmark"
+	"github.com/indietool/cli/certmark"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"

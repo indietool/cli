@@ -3,8 +3,8 @@ package providers
 import (
 	"context"
 	"fmt"
-	"indietool/cli/dns"
-	"indietool/cli/domains"
+	"github.com/indietool/cli/dns"
+	"github.com/indietool/cli/domains"
 	"strings"
 
 	"github.com/charmbracelet/log"

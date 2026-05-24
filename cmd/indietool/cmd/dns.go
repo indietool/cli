@@ -4,8 +4,8 @@ Copyright © 2025
 package cmd
 
 import (
-	"indietool/cli/dns"
-	"indietool/cli/indietool"
+	"github.com/indietool/cli/dns"
+	"github.com/indietool/cli/indietool"
 
 	"github.com/spf13/cobra"
 )

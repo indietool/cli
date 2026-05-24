@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"indietool/cli/indietool"
+	"github.com/indietool/cli/indietool"
 	"os"
 
 	"github.com/spf13/cobra"

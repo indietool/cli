@@ -2,8 +2,8 @@ package indietool
 
 import (
 	"fmt"
-	"indietool/cli/indietool/secrets"
-	"indietool/cli/providers"
+	"github.com/indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/providers"
 	"os"
 	"path/filepath"
 

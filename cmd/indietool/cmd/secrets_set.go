@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/indietool/secrets"
 )
 
 var secretsSetCmd = &cobra.Command{

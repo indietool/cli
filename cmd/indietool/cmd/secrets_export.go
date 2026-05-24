@@ -12,7 +12,7 @@ import (
 	"filippo.io/age"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"indietool/cli/indietool/secrets"
+	"github.com/indietool/cli/indietool/secrets"
 )
 
 var secretsExportCmd = &cobra.Command{

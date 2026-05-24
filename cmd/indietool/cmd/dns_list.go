@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"indietool/cli/dns"
-	"indietool/cli/output"
+	"github.com/indietool/cli/dns"
+	"github.com/indietool/cli/output"
 	"os"
 
 	"github.com/charmbracelet/log"

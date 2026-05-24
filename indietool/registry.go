@@ -2,8 +2,8 @@ package indietool
 
 import (
 	"context"
-	"indietool/cli/domains"
-	"indietool/cli/providers"
+	"github.com/indietool/cli/domains"
+	"github.com/indietool/cli/providers"
 	"reflect"
 )
 

@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"indietool/cli/dns"
-	"indietool/cli/indietool"
+	"github.com/indietool/cli/dns"
+	"github.com/indietool/cli/indietool"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"

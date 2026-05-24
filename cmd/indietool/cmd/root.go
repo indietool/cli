@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"indietool/cli/indietool"
-	"indietool/cli/indietool/metrics"
+	"github.com/indietool/cli/indietool"
+	"github.com/indietool/cli/indietool/metrics"
 	"os"
 	"path/filepath"
 	"strings"

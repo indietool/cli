@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"indietool/cli/domains"
+	"github.com/indietool/cli/domains"
 	"io"
 	"net/http"
 	"time"

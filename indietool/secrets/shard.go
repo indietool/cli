@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"filippo.io/age"
-	"indietool/cli/indietool/shamir"
+	"github.com/indietool/cli/indietool/shamir"
 )
 
 const (
