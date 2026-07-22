@@ -11,6 +11,12 @@ Tired of bouncing between registrars, tracking domain renewals in spreadsheets, 
 
 No dashboards. No vendor lock-in. Just you and your terminal.
 
+## 🎬 See it in action
+
+![indietool demo](docs/demo.gif)
+
+> *Demo: `domain explore` -> `domains list` -> `dns set` -> `secret get` in under 30 seconds*
+
 ---
 
 ## 🚀 Quick Start
@@ -18,14 +24,25 @@ No dashboards. No vendor lock-in. Just you and your terminal.
 ### Installation
 
 ```bash
-# macOS/Linux (recommended)
+# Homebrew (recommended)
+brew install indietool/tap/indietool
+
+# Go
 go install github.com/indietool/cli@latest
+
+# Binary releases (macOS, Linux, Windows)
+# Download from https://github.com/indietool/cli/releases
+
+# Shell completions
+indietool completion bash > /usr/local/share/bash-completion/completions/indietool
+indietool completion zsh > /usr/local/share/zsh/site-functions/_indietool
+indietool completion fish > ~/.config/fish/completions/indietool.fish
 ```
 
 ### Try it in 30 seconds
 
 ```bash
-# Check domain availability
+# Check domain availability (no API keys needed!)
 indietool domain explore myapp
 
 # Save a test API key (auto-creates encryption key)
@@ -128,7 +145,7 @@ indietool domain search awesomeproject.io
 
 ### 📊 Track All Your Domains in One Place
 
-**Problem:** Domains expire. You don’t want surprises.
+**Problem:** Domains expire. You don't want surprises.
 **Solution:** View all domains across registrars in one simple table.
 
 First, connect your registrar(s):
@@ -190,13 +207,13 @@ indietool dns list example.com
 ```
 DNS Provider: cloudflare
 TYPE  NAME     CONTENT
-A     ☁️@      192.168.1.1
+A     @        192.168.1.1
 A     www      192.168.1.2
-CNAME ☁️api    example.com
+CNAME api      example.com
 MX    @        10 mail.example.com
 ```
 
-_Note: ☁️ indicates Cloudflare proxied records, available only with the Cloudflare provider, for domains hosted on Cloudflare_
+_Note: Cloudflare proxied records are indicated with a cloud icon, available only with the Cloudflare provider, for domains hosted on Cloudflare_
 
 #### Get detailed view
 
@@ -206,9 +223,9 @@ indietool dns list example.com --wide
 
 ```
 TYPE  NAME     CONTENT          TTL   PRIORITY  ID
-A     ☁️@      192.168.1.1      300             abc123
+A     @        192.168.1.1      300             abc123
 A     www      192.168.1.2      300             def456
-CNAME ☁️api    example.com      300             ghi789
+CNAME api      example.com      300             ghi789
 MX    @        mail.example.com 300   10        jkl012
 ```
 
@@ -258,10 +275,10 @@ indietool dns delete example.com old-record A --provider namecheap
 
 #### Supported DNS providers
 
-- ✅ **Cloudflare** - Full CRUD operations with proxy status indicators
-- ✅ **Porkbun** - Complete DNS record management (list, set, delete)
-- ✅ **Namecheap** - Full CRUD support with batch operations
-- ✅ **The Little Host** - Full DNS record management
+- **Cloudflare** - Full CRUD operations with proxy status indicators
+- **Porkbun** - Complete DNS record management (list, set, delete)
+- **Namecheap** - Full CRUD support with batch operations
+- **The Little Host** - Full DNS record management
 
 #### Auto-detection
 
@@ -283,7 +300,7 @@ indietool dns delete example.com old-record A --provider namecheap
 | Component             | Backend   | Stored At                                        | Encrypted |
 | --------------------- | --------- | ------------------------------------------------ | --------- |
 | Secrets Database      | both      | `~/.config/indietool/secrets/`                   | ✅        |
-| Encryption Key        | keyring   | OS Keyring (`Keychain`, `gnome-keyring`)          | ✅        |
+| Encryption Key        | keyring   | OS Keychain / gnome-keyring                      | ✅        |
 | Encryption Key        | age-ssh   | `~/.config/indietool/keys/db-key-<database>.age` | ✅        |
 
 `indietool` supports two backends for storing the database encryption key:
@@ -314,8 +331,8 @@ If `indietool` detects that the keyring is unavailable (e.g. in an SSH session),
 
 ```bash
 indietool secret set stripe-key "sk_test_..." --note "Stripe test key"
-✓ Auto-generated encryption key for database 'default'
-✓ Secret 'stripe-key' stored successfully
+Auto-generated encryption key for database 'default'
+Secret 'stripe-key' stored successfully
 ```
 
 #### Organize secrets with custom databases
@@ -379,11 +396,35 @@ indietool secrets db delete staging
 indietool secrets db delete staging --force
 ```
 
-#### Use in environment variable
+#### Use in scripts
 
 ```bash
+# Inject secret into command
+indietool secret exec stripe-key -- curl -H "Authorization: Bearer *** https://api.stripe.com/v1/charges
+
+# Use in environment variable
 export STRIPE_KEY=$(indietool secret get stripe-key -S)
 ```
+
+---
+
+## 🔒 Security & Privacy
+
+**Where secrets live:**
+- Secrets are encrypted with AES-256-GCM at `~/.config/indietool/secrets/`
+- The encryption key is stored in your OS keyring (default) or as an age-encrypted file (`~/.config/indietool/keys/`)
+- **No cloud, no sync, no telemetry** — everything stays on your machine
+
+**Threat model:**
+- `indietool` never phones home. Zero telemetry.
+- Secrets are useless without your encryption key (OS keyring or SSH private key)
+- If you lose your machine, secrets are unrecoverable (by design)
+- For cross-host access, use `age-ssh` backend + SSH agent forwarding
+
+**Provider tokens:**
+- API keys for Cloudflare/Porkbun/etc. are stored in `~/.config/indietool/config.yaml`
+- File permissions are restricted to your user (`chmod 600`)
+- Consider using environment variables or `indietool secrets` for sensitive tokens in shared environments
 
 ---
 
@@ -396,14 +437,14 @@ export STRIPE_KEY=$(indietool secret get stripe-key -S)
 | Cloudflare      | ✅      | ✅  | ❌      |
 | Porkbun         | ✅      | ✅  | ❌      |
 | Namecheap       | ✅      | ✅  | ❌      |
-| GoDaddy         | ✅      | ❌  | ❌      |
+| GoDaddy         | ✅      | 🚧  | ❌      |
 | The Little Host | ❌      | ✅  | ❌      |
 | Local           | ❌      | ❌  | ✅      |
 
 **Legend:**
 
 - ✅ Full support
-- 🚧 In development
+- 🚧 In development (GoDaddy DNS coming soon)
 - ❌ Not supported
 
 **Notes:**
@@ -428,7 +469,9 @@ Secrets are useless without your encryption key. With the default keyring backen
 
 ### ❓ Does it work on Windows?
 
-Not yet — currently macOS and Linux only. Windows support is planned.
+**Experimental.** Windows binaries are available in [releases](https://github.com/indietool/cli/releases), but testing is limited. macOS and Linux are fully supported.
+
+If you're on Windows and hit issues, please [open an issue](https://github.com/indietool/cli/issues) — we want to make it work!
 
 ---
 
@@ -468,17 +511,17 @@ ssh -A yourserver.example.com
 
 ## 🚫 Limitations
 
-- ❌ No Windows support (yet)
 - 🧩 Registrar support: Cloudflare, Porkbun, Namecheap, GoDaddy
 - ☁️ DNS management: GoDaddy implementation in progress
 - 💻 CLI only — no web UI or GUI planned
 - 🔄 Secrets not synced across machines (by design — use age-ssh for cross-host access via SSH agent forwarding)
+- 🪟 Windows support is experimental
 
 ---
 
 ## ❤️ Built for indie builders who just want to ship
 
-Stop wasting time in control panels and spreadsheets.
-Let `indietool` handle the busywork — so you can focus on building.
-
-[Get Started →](https://indietool.dev)
+- 🌐 [indietool.dev](https://indietool.dev)
+- 📦 [GitHub Releases](https://github.com/indietool/cli/releases)
+- 🐛 [Report issues](https://github.com/indietool/cli/issues)
+- 💬 [Discussions & roadmap](https://github.com/indietool/cli/discussions)
