@@ -1,8 +1,10 @@
 # `indietool`
 
+> **The fast builder's toolkit — less managing, more making**
+
 Tired of bouncing between registrars, tracking domain renewals in spreadsheets, and copy-pasting secrets into `.env` files?
 
-🎯 `indietool` is a CLI tool for indie builders that helps you
+🎯 `indietool` is the fast builder's toolkit — less managing, more making. It helps you
 
 - 🌍 Hunt domain names across 50+ TLDs — in seconds
 - 🗓️ Track expiries across registrars like Cloudflare & Porkbun
