@@ -406,7 +406,16 @@ indietool secret exec stripe-key -- curl -H "Authorization: Bearer *** https://a
 
 # Use in environment variable
 export STRIPE_KEY=$(indietool secret get stripe-key -S)
+
+# Machine-readable output (global flag)
+indietool version --json
+indietool dns list example.com --json
+indietool dns set example.com www A 1.2.3.4 --dry-run --json
 ```
+
+**Exit codes:** `0` success · `1` error · `2` reserved for warnings/attention (e.g. future `health`)
+
+**`--dry-run`:** supported on mutating DNS (`dns set`, `dns delete`). JSON mode skips interactive confirmation.
 
 ---
 

@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/indietool/cli/domains"
-	"github.com/indietool/cli/output"
 	"os"
 	"strings"
+
+	"github.com/indietool/cli/domains"
+	"github.com/indietool/cli/output"
 
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ Examples:
   indietool domain search mydomain.org anotherdomain.net --wide
   indietool domain search startup.dev indie.co --no-color`,
 	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		domainList := make([]string, 0, len(args))
 		for _, domain := range args {
 			domain = strings.TrimSpace(strings.ToLower(domain))
@@ -49,8 +50,7 @@ Examples:
 		}
 
 		if len(domainList) == 0 {
-			fmt.Fprintf(os.Stderr, "No valid domains provided\n")
-			os.Exit(1)
+			return fmt.Errorf("no valid domains provided")
 		}
 
 		// Search all domains concurrently
@@ -70,9 +70,9 @@ Examples:
 		table.AddRows(rows)
 
 		if err := table.RenderWithSummary(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error rendering table: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error rendering table: %w", err)
 		}
+		return nil
 	},
 }
 

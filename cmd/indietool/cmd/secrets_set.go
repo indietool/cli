@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/indietool/cli/indietool/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretsSetCmd = &cobra.Command{
@@ -17,6 +17,15 @@ var secretsSetCmd = &cobra.Command{
 	Long:  "Store an encrypted secret with an optional note. The secret will be encrypted and stored securely. Use name@database to specify a custom database.",
 	Args:  cobra.ExactArgs(2),
 	RunE:  setSecret,
+}
+
+type secretSetJSON struct {
+	Status    string     `json:"status"`
+	Name      string     `json:"name"`
+	Database  string     `json:"database"`
+	Note      string     `json:"note,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Message   string     `json:"message"`
 }
 
 func init() {
@@ -72,13 +81,27 @@ func setSecret(cmd *cobra.Command, args []string) error {
 			if resolveErr := resolveKeyBackend(secretsConfig, keyringErr); resolveErr != nil {
 				return resolveErr
 			}
-			fmt.Fprintln(os.Stderr, "⚠  Using age-ssh for this session. Run 'indietool secrets init --backend age-ssh' to make this permanent.")
-			fmt.Fprintln(os.Stderr)
+			if !jsonOutput {
+				fmt.Fprintln(os.Stderr, "⚠  Using age-ssh for this session. Run 'indietool secrets init --backend age-ssh' to make this permanent.")
+				fmt.Fprintln(os.Stderr)
+			}
 			err = manager.SetSecret(name, value, database, note, expiresAt)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to store secret: %w", err)
 		}
+	}
+
+	msg := fmt.Sprintf("Secret '%s' stored successfully", name)
+	if jsonOutput {
+		return printJSON(secretSetJSON{
+			Status:    "success",
+			Name:      name,
+			Database:  database,
+			Note:      note,
+			ExpiresAt: expiresAt,
+			Message:   msg,
+		})
 	}
 
 	fmt.Printf("✓ Secret '%s' stored successfully", name)

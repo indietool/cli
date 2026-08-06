@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/indietool/cli/indietool/secrets"
 	"strings"
+	"time"
 
+	"github.com/indietool/cli/indietool/secrets"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +15,18 @@ var secretsGetCmd = &cobra.Command{
 	Long:  "Retrieve and display a secret value. By default, the value is masked for security. Use name@database to specify a custom database.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  getSecret,
+}
+
+type secretGetJSON struct {
+	Name      string     `json:"name"`
+	Database  string     `json:"database"`
+	Value     string     `json:"value,omitempty"`
+	Masked    bool       `json:"masked"`
+	Note      string     `json:"note,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Expired   bool       `json:"expired"`
 }
 
 func init() {
@@ -52,6 +65,25 @@ func getSecret(cmd *cobra.Command, args []string) error {
 	secret, err := manager.GetSecret(name, database)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve secret: %w", err)
+	}
+
+	if jsonOutput {
+		out := secretGetJSON{
+			Name:      secret.Name,
+			Database:  database,
+			Masked:    !show,
+			Note:      secret.Note,
+			CreatedAt: secret.CreatedAt,
+			UpdatedAt: secret.UpdatedAt,
+			ExpiresAt: secret.ExpiresAt,
+			Expired:   secret.IsExpired(),
+		}
+		if show {
+			out.Value = secret.Value
+		} else {
+			out.Value = "***MASKED***"
+		}
+		return printJSON(out)
 	}
 
 	if show {

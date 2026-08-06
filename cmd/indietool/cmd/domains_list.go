@@ -3,12 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/indietool/cli/domains"
-	"github.com/indietool/cli/indietool"
-	"github.com/indietool/cli/output"
 	"os"
 	"sort"
 	"sync"
+
+	"github.com/indietool/cli/domains"
+	"github.com/indietool/cli/indietool"
+	"github.com/indietool/cli/output"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
@@ -36,12 +37,11 @@ Examples:
   indietool domains list --provider cloudflare
   indietool domains list --expiring-in 30d
   indietool domains list --status critical --json`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get the global provider registry
 		registry := GetProviderRegistry()
 		if registry == nil {
-			handleError(fmt.Errorf("provider registry not initialized"))
-			return
+			return fmt.Errorf("provider registry not initialized")
 		}
 
 		registrars := indietool.GetProviders[domains.Registrar](registry)
@@ -93,13 +93,14 @@ Examples:
 
 		if listShowSummary || (!jsonOutput && format != output.FormatJSON) {
 			if err := table.RenderWithSummary(); err != nil {
-				handleError(fmt.Errorf("failed to render table: %w", err))
+				return fmt.Errorf("failed to render table: %w", err)
 			}
 		} else {
 			if err := table.Render(); err != nil {
-				handleError(fmt.Errorf("failed to render table: %w", err))
+				return fmt.Errorf("failed to render table: %w", err)
 			}
 		}
+		return nil
 	},
 }
 
@@ -141,10 +142,4 @@ func calculateDomainSummary(domainList []domains.ManagedDomain) domains.DomainSu
 	}
 
 	return summary
-}
-
-// handleError is a placeholder for error handling
-func handleError(err error) {
-	// TODO: Implement proper error handling
-	log.Errorf("Error: %v", err)
 }

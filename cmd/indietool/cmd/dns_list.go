@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/indietool/cli/dns"
 	"github.com/indietool/cli/output"
-	"os"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
@@ -25,21 +25,19 @@ Examples:
   indietool dns list example.com --provider cloudflare
   indietool dns list example.com --json`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		domain := args[0]
 
 		// Get DNS manager from parent command
 		dnsManager := GetDNSManager()
 		if dnsManager == nil {
-			handleDNSError(fmt.Errorf("DNS manager not initialized"))
-			return
+			return fmt.Errorf("DNS manager not initialized")
 		}
 
 		// List DNS records using parent provider flag
 		records, detectionResult, err := dnsManager.ListRecords(context.TODO(), domain, GetDNSProvider())
 		if err != nil {
-			handleDNSError(fmt.Errorf("failed to list DNS records: %w", err))
-			return
+			return fmt.Errorf("failed to list DNS records: %w", err)
 		}
 
 		// Resolve provider name from flag or detection
@@ -57,15 +55,13 @@ Examples:
 
 		// Output records
 		if jsonOutput {
-			data, _ := json.MarshalIndent(map[string]interface{}{
+			return printJSON(map[string]interface{}{
 				"domain":   domain,
 				"provider": resolvedProvider,
 				"records":  records,
-			}, "", "  ")
-			fmt.Println(string(data))
-		} else {
-			outputDNSRecordsTable(records, domain, resolvedProvider)
+			})
 		}
+		return outputDNSRecordsTable(records, domain, resolvedProvider)
 	},
 }
 
@@ -74,10 +70,10 @@ func init() {
 	// Flags are now handled by parent dns command
 }
 
-func outputDNSRecordsTable(records []dns.Record, domain string, provider string) {
+func outputDNSRecordsTable(records []dns.Record, domain string, provider string) error {
 	if len(records) == 0 {
 		fmt.Printf("No DNS records found for domain: %s\n", domain)
-		return
+		return nil
 	}
 
 	// Get output flags from parent DNS command
@@ -156,10 +152,7 @@ func outputDNSRecordsTable(records []dns.Record, domain string, provider string)
 	}
 
 	if err := table.Render(); err != nil {
-		handleDNSError(fmt.Errorf("failed to render table: %w", err))
+		return fmt.Errorf("failed to render table: %w", err)
 	}
-}
-
-func handleDNSError(err error) {
-	log.Errorf("Error: %v", err)
+	return nil
 }

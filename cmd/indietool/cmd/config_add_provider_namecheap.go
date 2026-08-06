@@ -92,7 +92,20 @@ API settings.`,
 			clientInfo = fmt.Sprintf(" (client IP: %s)", clientIP)
 		}
 
-		log.Infof("Successfully added and enabled Namecheap provider configuration (environment: %s)%s", environment, clientInfo)
+		msg := fmt.Sprintf("Successfully added and enabled Namecheap provider configuration (environment: %s)%s", environment, clientInfo)
+		if jsonOutput {
+			return printJSON(map[string]interface{}{
+				"status":      "success",
+				"provider":    "namecheap",
+				"enabled":     true,
+				"environment": environment,
+				"client_ip":   clientIP,
+				"sandbox":     namecheapSandbox,
+				"message":     msg,
+			})
+		}
+
+		log.Info(msg)
 
 		return nil
 	},

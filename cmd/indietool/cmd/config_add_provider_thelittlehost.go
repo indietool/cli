@@ -44,6 +44,16 @@ account dashboard. Keys are prefixed with tlh_.`,
 
 		cfg.Providers.TheLittleHost = tlhConfig
 
+		if jsonOutput {
+			return printJSON(map[string]interface{}{
+				"status":   "success",
+				"provider": "thelittlehost",
+				"enabled":  true,
+				"base_url": thelittlehostBaseURL,
+				"message":  "Successfully added and enabled The Little Host provider configuration",
+			})
+		}
+
 		log.Info("Successfully added and enabled The Little Host provider configuration")
 
 		return nil

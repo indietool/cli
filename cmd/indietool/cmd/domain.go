@@ -44,21 +44,42 @@ enabled registrars and configuration validation results.`,
 			PendingItems(metricsAgent.Observe(commandName, args, metadata, 0))
 		}
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Example of using the global config
 		cfg := GetConfig()
 		if cfg == nil {
+			if jsonOutput {
+				return printJSON(map[string]interface{}{
+					"valid":   false,
+					"message": "No configuration available",
+				})
+			}
 			fmt.Println("No configuration available")
-			return
+			return nil
 		}
 
 		if !cfg.Valid() {
+			if jsonOutput {
+				return printJSON(map[string]interface{}{
+					"valid":   false,
+					"message": "No valid configuration loaded - check your config file",
+				})
+			}
 			fmt.Println("No valid configuration loaded - check your config file")
-			return
+			return nil
 		}
 
 		// Show enabled registrars
 		enabledProviders := cfg.GetEnabledProviders()
+		validationErrors := cfg.ValidateConfig()
+		if jsonOutput {
+			return printJSON(map[string]interface{}{
+				"enabled_providers": enabledProviders,
+				"valid":             len(validationErrors) == 0,
+				"validation_errors": validationErrors,
+			})
+		}
+
 		if len(enabledProviders) == 0 {
 			fmt.Println("No registrars are enabled in the configuration")
 		} else {
@@ -66,11 +87,12 @@ enabled registrars and configuration validation results.`,
 		}
 
 		// Show configuration validation status
-		if errors := cfg.ValidateConfig(); len(errors) > 0 {
-			fmt.Printf("Configuration validation issues: %v\n", errors)
+		if len(validationErrors) > 0 {
+			fmt.Printf("Configuration validation issues: %v\n", validationErrors)
 		} else {
 			fmt.Println("Configuration is valid")
 		}
+		return nil
 	},
 }
 

@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/indietool/cli/indietool/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretsJoinCmd = &cobra.Command{
@@ -70,15 +69,12 @@ func joinSecret(cmd *cobra.Command, args []string) error {
 	}
 
 	if jsonOutput {
-		result := map[string]interface{}{
+		return printJSON(map[string]interface{}{
 			"status":      "success",
 			"shards_used": len(parts),
 			"output_file": outFile,
 			"size_bytes":  len(decrypted),
-		}
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(result)
+		})
 	}
 
 	fmt.Fprintf(os.Stderr, "Recovered secret from %d shard(s)\n", len(parts))

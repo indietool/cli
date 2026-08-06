@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/big"
+	"strings"
+	"time"
 
 	"github.com/indietool/cli/certmark"
 
@@ -16,11 +19,32 @@ var (
 	certInsecure  bool
 )
 
+// certShowJSON is the machine-readable shape for cert show --json.
+type certShowJSON struct {
+	Source      string          `json:"source"` // "file" or "host"
+	Target      string          `json:"target"`
+	Serial      string          `json:"serial"`
+	Subject     string          `json:"subject"`
+	Issuer      string          `json:"issuer"`
+	IssuerOrg   []string        `json:"issuer_org,omitempty"`
+	NotBefore   time.Time       `json:"not_before"`
+	NotAfter    time.Time       `json:"not_after"`
+	DNSNames    []string        `json:"dns_names,omitempty"`
+	TLS         *certShowTLSJSON `json:"tls,omitempty"`
+	CrtSH       string          `json:"crt_sh,omitempty"`
+	Fingerprint string          `json:"fingerprint_md5,omitempty"`
+}
+
+type certShowTLSJSON struct {
+	Version     string `json:"version"`
+	CipherSuite string `json:"cipher_suite"`
+}
+
 var certShowCmd = &cobra.Command{
 	Use:   "show <cert-file|hostname>",
 	Short: "Show certificate details and visual fingerprint",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		target := args[0]
 
 		var result *certmark.CertResult
@@ -31,17 +55,42 @@ var certShowCmd = &cobra.Command{
 			log.Debugf("%s", err)
 			var pe *fs.PathError
 			if !errors.As(err, &pe) {
-				log.Fatalf("%s", err)
+				return err
 			}
 
 			result, err = certmark.ReadCertHost(target, certInsecure)
 			if err != nil {
-				log.Fatalf("%s", err)
+				return err
 			}
 			isHost = true
 		}
 
 		cert := result.Cert
+
+		if jsonOutput {
+			out := certShowJSON{
+				Source:    "file",
+				Target:    target,
+				Serial:    formatSerial(cert.SerialNumber),
+				Subject:   cert.Subject.CommonName,
+				Issuer:    cert.Issuer.CommonName,
+				IssuerOrg: cert.Issuer.Organization,
+				NotBefore: cert.NotBefore,
+				NotAfter:  cert.NotAfter,
+				DNSNames:  cert.DNSNames,
+			}
+			if isHost {
+				out.Source = "host"
+				out.CrtSH = fmt.Sprintf("https://crt.sh/?q=%s", target)
+			}
+			if result.TLSInfo != nil {
+				out.TLS = &certShowTLSJSON{
+					Version:     result.TLSInfo.VersionString(),
+					CipherSuite: result.TLSInfo.CipherSuiteString(),
+				}
+			}
+			return printJSON(out)
+		}
 
 		if result.TLSInfo != nil {
 			fmt.Printf("** TLS Connection **\n")
@@ -62,7 +111,27 @@ var certShowCmd = &cobra.Command{
 
 		graphType := certmark.GraphType(certGraphType)
 		fmt.Printf("\n%s\n", certmark.GenerateGraphicFromCert(cert, certmark.GraphConfig{Type: graphType}))
+		return nil
 	},
+}
+
+func formatSerial(n *big.Int) string {
+	if n == nil {
+		return ""
+	}
+	// Match human output spacing loosely as hex pairs without requiring spaces in JSON
+	hex := fmt.Sprintf("%x", n)
+	if len(hex)%2 == 1 {
+		hex = "0" + hex
+	}
+	var b strings.Builder
+	for i := 0; i < len(hex); i += 2 {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(hex[i : i+2])
+	}
+	return b.String()
 }
 
 func init() {

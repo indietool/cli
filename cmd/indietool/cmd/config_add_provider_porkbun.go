@@ -49,6 +49,15 @@ You can obtain your API key and secret from your Porkbun account dashboard.`,
 		// Set the Porkbun config
 		cfg.Providers.Porkbun = porkbunConfig
 
+		if jsonOutput {
+			return printJSON(map[string]interface{}{
+				"status":   "success",
+				"provider": "porkbun",
+				"enabled":  true,
+				"message":  "Successfully added and enabled Porkbun provider configuration",
+			})
+		}
+
 		log.Info("Successfully added and enabled Porkbun provider configuration")
 
 		return nil
