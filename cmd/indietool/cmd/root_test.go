@@ -275,6 +275,11 @@ func newTestConfigFile(t *testing.T) string {
 	domainRegisterDryRun = false
 	domainsRenewOn = false
 	domainsRenewOff = false
+	domainSetAutoRenew = false
+	domainSetPrivacy = false
+	domainSetLocked = false
+	domainSetOn = false
+	domainSetOff = false
 
 	tempDir := t.TempDir()
 	testConfigPath := filepath.Join(tempDir, "config.yaml")
