@@ -120,6 +120,9 @@ func (c *Config) ValidateConfig() []string {
 		if cf.APIToken == "" && (cf.APIKey == "" || cf.Email == "") {
 			errors = append(errors, "Cloudflare: either api_token or both api_key and email must be provided")
 		}
+		if cf.AccountId == "" {
+			errors = append(errors, "Cloudflare: account_id is required for registrar operations (set it with 'indietool config add provider cloudflare --account-id')")
+		}
 	}
 
 	// Validate Porkbun config if present

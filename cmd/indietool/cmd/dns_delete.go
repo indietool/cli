@@ -86,7 +86,7 @@ func runDNSDelete(cmd *cobra.Command, args []string) error {
 		if len(filters) > 0 {
 			errorMsg += " with " + strings.Join(filters, " and ")
 		}
-		return fmt.Errorf(errorMsg)
+		return fmt.Errorf("%s", errorMsg)
 	}
 
 	// Show confirmation unless --force

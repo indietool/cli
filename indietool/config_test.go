@@ -1,8 +1,46 @@
 package indietool
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/indietool/cli/providers"
 )
+
+func TestCloudflareAccountIDValidation(t *testing.T) {
+	t.Run("account_id present", func(t *testing.T) {
+		cfg := GetDefaultConfig()
+		cfg.Providers.Cloudflare = &providers.CloudflareConfig{
+			AccountId: "acc-123",
+			APIToken:  "token",
+			Enabled:   true,
+		}
+
+		for _, errMsg := range cfg.ValidateConfig() {
+			if strings.Contains(errMsg, "account_id") {
+				t.Errorf("Did not expect account_id validation error, got: %s", errMsg)
+			}
+		}
+	})
+
+	t.Run("account_id missing", func(t *testing.T) {
+		cfg := GetDefaultConfig()
+		cfg.Providers.Cloudflare = &providers.CloudflareConfig{
+			APIToken: "token",
+			Enabled:  true,
+		}
+
+		found := false
+		for _, errMsg := range cfg.ValidateConfig() {
+			if strings.Contains(errMsg, "account_id") {
+				found = true
+			}
+		}
+		if !found {
+			t.Error("Expected a validation error mentioning account_id when it is missing")
+		}
+	})
+}
 
 func TestSecretsDirectoryCalculation(t *testing.T) {
 	// Test default config
