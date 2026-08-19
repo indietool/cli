@@ -39,9 +39,13 @@ func (c *CloudflareConfig) SetEnabled(enabled bool) {
 
 // CloudflareProvider implements the Provider interface for Cloudflare
 type CloudflareProvider struct {
-	client *cloudflare.Client
-	config CloudflareConfig
+	client    *cloudflare.Client
+	config    CloudflareConfig
+	purchaser *RegistrarPurchaseClient
 }
+
+// Compile-time assertion that CloudflareProvider supports purchasing.
+var _ domains.Purchaser = (*CloudflareProvider)(nil)
 
 // NewCloudflareProvider creates a new Cloudflare provider instance
 func NewCloudflareProvider() *CloudflareProvider {
@@ -54,17 +58,24 @@ func NewCloudflare(config CloudflareConfig) *CloudflareProvider {
 		config: config,
 	}
 
+	var opts []option.RequestOption
+	if base := CloudflareAPIBase(); base != defaultCloudflareAPIBase {
+		opts = append(opts, option.WithBaseURL(base))
+	}
+
 	if cf.config.APIKey != "" && cf.config.Email != "" {
 		log.Debug("Provisioning Cloudflare provider with API key and email")
-		cf.client = cloudflare.NewClient(
+		keyOpts := append([]option.RequestOption{
 			option.WithAPIEmail(cf.config.Email),
 			option.WithAPIKey(cf.config.APIKey),
-		)
+		}, opts...)
+		cf.client = cloudflare.NewClient(keyOpts...)
 	} else if cf.config.APIToken != "" {
 		log.Debug("Provisioning Cloudflare provider with API token")
-		cf.client = cloudflare.NewClient(
+		tokenOpts := append([]option.RequestOption{
 			option.WithAPIToken(cf.config.APIToken),
-		)
+		}, opts...)
+		cf.client = cloudflare.NewClient(tokenOpts...)
 	}
 
 	return cf
@@ -94,6 +105,32 @@ func (c *CloudflareProvider) Validate(ctx context.Context) error {
 // AsRegistrar returns the registrar interface for domain operations
 func (c *CloudflareProvider) AsRegistrar() domains.Registrar {
 	return c
+}
+
+// purchaseClient lazily builds the beta registrar purchase API client.
+func (c *CloudflareProvider) purchaseClient() *RegistrarPurchaseClient {
+	if c.purchaser == nil {
+		c.purchaser = NewRegistrarPurchaseClient(c.config.AccountId, c.config.APIToken)
+	}
+	return c.purchaser
+}
+
+// Check implements the domains.Purchaser capability using the beta Cloudflare
+// Registrar purchase API (real-time availability + pricing).
+func (c *CloudflareProvider) Check(ctx context.Context, names []string) ([]domains.Availability, error) {
+	return c.purchaseClient().Check(ctx, names)
+}
+
+// Register implements the domains.Purchaser capability using the beta
+// Cloudflare Registrar purchase API. Billable and non-refundable.
+func (c *CloudflareProvider) Register(ctx context.Context, name string) (*domains.RegistrationResult, error) {
+	return c.purchaseClient().Register(ctx, name)
+}
+
+// RegistrationStatus implements the domains.Purchaser capability by polling
+// the beta registration workflow state.
+func (c *CloudflareProvider) RegistrationStatus(ctx context.Context, name string) (*domains.RegistrationResult, error) {
+	return c.purchaseClient().RegistrationStatus(ctx, name)
 }
 
 // ListDomains retrieves all domains from Cloudflare
