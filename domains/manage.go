@@ -45,6 +45,8 @@ type ManagedDomain struct {
 	Provider    string       `json:"provider"`
 	ExpiryDate  time.Time    `json:"expiry_date"`
 	AutoRenewal bool         `json:"auto_renewal"`
+	Locked      bool         `json:"locked"`
+	Privacy     bool         `json:"privacy"`
 	Nameservers []string     `json:"nameservers"`
 	Status      DomainStatus `json:"status"`
 	LastUpdated time.Time    `json:"last_updated"`

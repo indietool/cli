@@ -2,10 +2,12 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/indietool/cli/dns"
 	"github.com/indietool/cli/domains"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/cloudflare/cloudflare-go/v4"
@@ -119,10 +121,21 @@ func (c *CloudflareProvider) ListDomains(ctx context.Context) ([]domains.Managed
 }
 
 func parseDomain(rd registrar.Domain) domains.ManagedDomain {
-	data := gjson.Parse(rd.JSON.RawJSON())
+	dm := parseDomainFromRaw(rd.JSON.RawJSON())
+	if dm.ExpiryDate.IsZero() {
+		dm.ExpiryDate = rd.ExpiresAt
+		dm.SetStatus()
+	}
+	return dm
+}
 
-	autorenew := data.Get("auto_renew").Bool()
-	name := data.Get("name").Str
+// parseDomainFromRaw parses a Cloudflare registrar domain object from its raw
+// JSON representation. The SDK's typed Domain struct does not expose every
+// field returned by the API (auto_renew, privacy, renewal_price, ...), so we
+// read them from the raw JSON via gjson.
+func parseDomainFromRaw(raw string) domains.ManagedDomain {
+	data := gjson.Parse(raw)
+
 	nameservers := []string{}
 	data.Get("name_servers").ForEach(func(key, value gjson.Result) bool {
 		nameservers = append(
@@ -133,20 +146,69 @@ func parseDomain(rd registrar.Domain) domains.ManagedDomain {
 	})
 
 	dm := domains.ManagedDomain{
-		Name:        name,
-		ExpiryDate:  rd.ExpiresAt,
+		Name:        data.Get("name").Str,
 		Provider:    "cloudflare",
-		AutoRenewal: autorenew,
+		AutoRenewal: data.Get("auto_renew").Bool(),
+		Locked:      data.Get("locked").Bool(),
+		Privacy:     data.Get("privacy").Bool(),
 		Nameservers: nameservers,
 	}
+
+	if expiresAt := data.Get("expires_at"); expiresAt.Exists() {
+		if expiry, err := time.Parse(time.RFC3339, expiresAt.Str); err == nil {
+			dm.ExpiryDate = expiry
+		}
+	}
+
+	if renewalPrice := data.Get("renewal_price"); renewalPrice.Exists() {
+		dm.Cost = &domains.DomainCost{
+			Currency:     "USD",
+			RenewalPrice: renewalPrice.Float(),
+		}
+	}
+
 	dm.SetStatus()
 	return dm
 }
 
+// getDomainRaw fetches a single domain from the Cloudflare registrar API and
+// returns the raw JSON of the result object.
+func (c *CloudflareProvider) getDomainRaw(ctx context.Context, name string) (string, error) {
+	res, err := c.client.Registrar.Domains.Get(
+		ctx,
+		name,
+		registrar.DomainGetParams{
+			AccountID: cloudflare.F(c.config.AccountId),
+		},
+	)
+	if err != nil {
+		return "", fmt.Errorf("provider/cloudflare: failed to get domain %s: %w", name, err)
+	}
+	if res == nil || *res == nil {
+		return "", fmt.Errorf("provider/cloudflare: domain %s not found", name)
+	}
+
+	// The SDK returns the get result as an untyped value; re-marshal it so we
+	// can parse it uniformly with gjson.
+	data, err := json.Marshal(*res)
+	if err != nil {
+		return "", fmt.Errorf("provider/cloudflare: failed to parse domain %s response: %w", name, err)
+	}
+	return string(data), nil
+}
+
 // GetDomain retrieves a specific domain from Cloudflare
 func (c *CloudflareProvider) GetDomain(ctx context.Context, name string) (*domains.ManagedDomain, error) {
-	// TODO: Implement get domain from Cloudflare API
-	return nil, fmt.Errorf("not implemented")
+	raw, err := c.getDomainRaw(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	dm := parseDomainFromRaw(raw)
+	if dm.Name == "" {
+		dm.Name = name
+	}
+	return &dm, nil
 }
 
 // UpdateAutoRenewal updates the auto-renewal setting for a domain
@@ -157,8 +219,20 @@ func (c *CloudflareProvider) UpdateAutoRenewal(ctx context.Context, name string,
 
 // GetRenewalInfo retrieves renewal pricing information
 func (c *CloudflareProvider) GetRenewalInfo(ctx context.Context, name string) (*domains.DomainCost, error) {
-	// TODO: Implement renewal info retrieval from Cloudflare API
-	return nil, fmt.Errorf("not implemented")
+	raw, err := c.getDomainRaw(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	data := gjson.Parse(raw)
+	cost := &domains.DomainCost{
+		Currency:     "USD",
+		RenewalPrice: data.Get("renewal_price").Float(),
+	}
+	if transferPrice := data.Get("transfer_price"); transferPrice.Exists() {
+		cost.TransferPrice = transferPrice.Float()
+	}
+	return cost, nil
 }
 
 // GetNameservers retrieves nameservers for a domain
