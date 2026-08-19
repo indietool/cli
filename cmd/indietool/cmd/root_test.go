@@ -271,6 +271,8 @@ func newTestConfigFile(t *testing.T) string {
 	cloudflareAccountID = ""
 	jsonOutput = false
 	verbose = false
+	domainRegisterYes = false
+	domainRegisterDryRun = false
 
 	tempDir := t.TempDir()
 	testConfigPath := filepath.Join(tempDir, "config.yaml")
