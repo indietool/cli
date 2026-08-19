@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -117,6 +118,44 @@ func TestGetDomain(t *testing.T) {
 	}
 	if len(dm.Nameservers) != 2 || dm.Nameservers[0] != "ara.ns.cloudflare.com" {
 		t.Errorf("unexpected nameservers: %v", dm.Nameservers)
+	}
+}
+
+func TestUpdateAutoRenewal(t *testing.T) {
+	var gotMethod, gotPath, gotBody string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read request body: %v", err)
+		}
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(cfEnvelope(t, domainGetFixture()))
+	})
+
+	p := newTestCloudflareProvider(t, handler)
+
+	if err := p.UpdateAutoRenewal(context.Background(), "example.dev", true); err != nil {
+		t.Fatalf("UpdateAutoRenewal returned error: %v", err)
+	}
+
+	if gotMethod != http.MethodPut {
+		t.Errorf("expected PUT request, got %s", gotMethod)
+	}
+	if want := "/accounts/" + testAccountID + "/registrar/domains/example.dev"; gotPath != want {
+		t.Errorf("expected request path %q, got %q", want, gotPath)
+	}
+	if !strings.Contains(gotBody, `"auto_renew":true`) {
+		t.Errorf("expected request body to set auto_renew true, got %q", gotBody)
+	}
+
+	if err := p.UpdateAutoRenewal(context.Background(), "example.dev", false); err != nil {
+		t.Fatalf("UpdateAutoRenewal returned error: %v", err)
+	}
+	if !strings.Contains(gotBody, `"auto_renew":false`) {
+		t.Errorf("expected request body to set auto_renew false, got %q", gotBody)
 	}
 }
 

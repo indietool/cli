@@ -213,8 +213,32 @@ func (c *CloudflareProvider) GetDomain(ctx context.Context, name string) (*domai
 
 // UpdateAutoRenewal updates the auto-renewal setting for a domain
 func (c *CloudflareProvider) UpdateAutoRenewal(ctx context.Context, name string, enabled bool) error {
-	// TODO: Implement auto-renewal update via Cloudflare API
-	return fmt.Errorf("not implemented")
+	return c.UpdateDomainSettings(ctx, name, domains.DomainSettings{
+		AutoRenew: &enabled,
+	})
+}
+
+// UpdateDomainSettings updates the mutable registrar settings (auto-renew,
+// registrar lock, WHOIS privacy) for a domain. Only non-nil fields are sent.
+func (c *CloudflareProvider) UpdateDomainSettings(ctx context.Context, name string, settings domains.DomainSettings) error {
+	params := registrar.DomainUpdateParams{
+		AccountID: cloudflare.F(c.config.AccountId),
+	}
+	if settings.AutoRenew != nil {
+		params.AutoRenew = cloudflare.F(*settings.AutoRenew)
+	}
+	if settings.Locked != nil {
+		params.Locked = cloudflare.F(*settings.Locked)
+	}
+	if settings.Privacy != nil {
+		params.Privacy = cloudflare.F(*settings.Privacy)
+	}
+
+	_, err := c.client.Registrar.Domains.Update(ctx, name, params)
+	if err != nil {
+		return fmt.Errorf("provider/cloudflare: failed to update domain %s: %w", name, err)
+	}
+	return nil
 }
 
 // GetRenewalInfo retrieves renewal pricing information
