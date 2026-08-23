@@ -3,11 +3,13 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/indietool/cli/domains"
 	"github.com/indietool/cli/indietool"
+	"github.com/indietool/cli/providers"
 
 	"github.com/spf13/cobra"
 )
@@ -43,13 +45,13 @@ func findRegistrarForDomain(ctx context.Context, name string) (domains.Registrar
 // domainsRenewCmd represents the domains renew command
 var domainsRenewCmd = &cobra.Command{
 	Use:   "renew <domain>",
-	Short: "Show renewal price and manage auto-renewal for a domain",
-	Long: `Show the renewal price and current auto-renewal status for a domain, or
-toggle auto-renewal with --on / --off.
+	Short: "Show renewal info and manage auto-renewal for a domain",
+	Long: `Show expiry and auto-renewal status for a domain, or toggle auto-renewal
+with --on / --off.
 
-Note: the Cloudflare Registrar API only manages auto-renewal. Manual early
-renewal (paying to extend a domain before it expires) is only available in
-the Cloudflare dashboard.
+Note: the Cloudflare Registrar API only manages auto-renewal. Renewal pricing
+is not exposed by the API, and manual early renewal (paying to extend a domain
+before it expires) is only available in the Cloudflare dashboard.
 
 Examples:
   indietool domains renew example.dev
@@ -97,20 +99,24 @@ Examples:
 		}
 
 		cost, err := registrar.GetRenewalInfo(cmd.Context(), name)
-		if err != nil {
+		pricingUnavailable := errors.Is(err, providers.ErrRenewalPricingUnavailable)
+		if err != nil && !pricingUnavailable {
 			return err
 		}
 
 		if jsonOutput {
-			data, err := json.MarshalIndent(map[string]any{
-				"domain":        name,
-				"provider":      dm.Provider,
-				"expiry_date":   dm.ExpiryDate,
-				"auto_renewal":  dm.AutoRenewal,
-				"currency":      cost.Currency,
-				"renewal_cost":  cost.RenewalPrice,
-				"transfer_cost": cost.TransferPrice,
-			}, "", "  ")
+			payload := map[string]any{
+				"domain":       name,
+				"provider":     dm.Provider,
+				"expiry_date":  dm.ExpiryDate,
+				"auto_renewal": dm.AutoRenewal,
+			}
+			if cost != nil {
+				payload["currency"] = cost.Currency
+				payload["renewal_cost"] = cost.RenewalPrice
+				payload["transfer_cost"] = cost.TransferPrice
+			}
+			data, err := json.MarshalIndent(payload, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal result: %w", err)
 			}
@@ -125,9 +131,13 @@ Examples:
 		fmt.Fprintf(out, "Domain:      %s (%s)\n", name, dm.Provider)
 		fmt.Fprintf(out, "Expires:     %s\n", dm.ExpiryDate.Format("2006-01-02"))
 		fmt.Fprintf(out, "Auto-renew:  %s\n", autoRenew)
-		fmt.Fprintf(out, "Renewal:     %.2f %s\n", cost.RenewalPrice, cost.Currency)
+		if cost != nil {
+			fmt.Fprintf(out, "Renewal:     %.2f %s\n", cost.RenewalPrice, cost.Currency)
+		} else {
+			fmt.Fprintln(out, "Renewal:     not available via the Registrar API (see the dashboard)")
+		}
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Note: the Cloudflare Registrar API only manages auto-renewal; manual early renewal is available in the dashboard.")
+		fmt.Fprintln(out, "Note: the Cloudflare Registrar API only manages auto-renewal; renewal pricing and manual early renewal are dashboard-only.")
 		return nil
 	},
 }

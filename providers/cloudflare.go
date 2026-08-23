@@ -2,20 +2,16 @@ package providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/indietool/cli/dns"
 	"github.com/indietool/cli/domains"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/cloudflare/cloudflare-go/v4"
 	cfDNS "github.com/cloudflare/cloudflare-go/v4/dns"
 	"github.com/cloudflare/cloudflare-go/v4/option"
-	"github.com/cloudflare/cloudflare-go/v4/registrar"
 	"github.com/cloudflare/cloudflare-go/v4/zones"
-	"github.com/tidwall/gjson"
 )
 
 // CloudflareConfig holds Cloudflare-specific configuration
@@ -133,167 +129,52 @@ func (c *CloudflareProvider) RegistrationStatus(ctx context.Context, name string
 	return c.purchaseClient().RegistrationStatus(ctx, name)
 }
 
-// ListDomains retrieves all domains from Cloudflare
+// ListDomains retrieves all domains from Cloudflare via the new Registrar API
+// (registrations list endpoint with cursor pagination). The legacy
+// /registrar/domains endpoints are deprecated by Cloudflare (EOL 2026-09-27)
+// and are no longer used.
 func (c *CloudflareProvider) ListDomains(ctx context.Context) ([]domains.ManagedDomain, error) {
-	cfdomains, err := c.client.Registrar.Domains.List(
-		ctx,
-		registrar.DomainListParams{
-			AccountID: cloudflare.F(c.config.AccountId),
-		},
-	)
+	list, err := c.purchaseClient().ListRegistrations(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("provider/cloudflare: failed to list domains: %w", err)
 	}
-
-	// log.Infof("cf domains: %+v", cfdomains)
-
-	domainList := make([]domains.ManagedDomain, 0, len(cfdomains.Result))
-	for _, d := range cfdomains.Result {
-		domainList = append(
-			domainList,
-			parseDomain(d),
-		)
-	}
-	return domainList, nil
+	return list, nil
 }
 
-func parseDomain(rd registrar.Domain) domains.ManagedDomain {
-	dm := parseDomainFromRaw(rd.JSON.RawJSON())
-	if dm.ExpiryDate.IsZero() {
-		dm.ExpiryDate = rd.ExpiresAt
-		dm.SetStatus()
-	}
-	return dm
-}
-
-// parseDomainFromRaw parses a Cloudflare registrar domain object from its raw
-// JSON representation. The SDK's typed Domain struct does not expose every
-// field returned by the API (auto_renew, privacy, renewal_price, ...), so we
-// read them from the raw JSON via gjson.
-func parseDomainFromRaw(raw string) domains.ManagedDomain {
-	data := gjson.Parse(raw)
-
-	nameservers := []string{}
-	data.Get("name_servers").ForEach(func(key, value gjson.Result) bool {
-		nameservers = append(
-			nameservers,
-			value.String(),
-		)
-		return true
-	})
-
-	dm := domains.ManagedDomain{
-		Name:        data.Get("name").Str,
-		Provider:    "cloudflare",
-		AutoRenewal: data.Get("auto_renew").Bool(),
-		Locked:      data.Get("locked").Bool(),
-		Privacy:     data.Get("privacy").Bool(),
-		Nameservers: nameservers,
-	}
-
-	if expiresAt := data.Get("expires_at"); expiresAt.Exists() {
-		if expiry, err := time.Parse(time.RFC3339, expiresAt.Str); err == nil {
-			dm.ExpiryDate = expiry
-		}
-	}
-
-	if renewalPrice := data.Get("renewal_price"); renewalPrice.Exists() {
-		dm.Cost = &domains.DomainCost{
-			Currency:     "USD",
-			RenewalPrice: renewalPrice.Float(),
-		}
-	}
-
-	dm.SetStatus()
-	return dm
-}
-
-// getDomainRaw fetches a single domain from the Cloudflare registrar API and
-// returns the raw JSON of the result object.
-func (c *CloudflareProvider) getDomainRaw(ctx context.Context, name string) (string, error) {
-	res, err := c.client.Registrar.Domains.Get(
-		ctx,
-		name,
-		registrar.DomainGetParams{
-			AccountID: cloudflare.F(c.config.AccountId),
-		},
-	)
-	if err != nil {
-		return "", fmt.Errorf("provider/cloudflare: failed to get domain %s: %w", name, err)
-	}
-	if res == nil || *res == nil {
-		return "", fmt.Errorf("provider/cloudflare: domain %s not found", name)
-	}
-
-	// The SDK returns the get result as an untyped value; re-marshal it so we
-	// can parse it uniformly with gjson.
-	data, err := json.Marshal(*res)
-	if err != nil {
-		return "", fmt.Errorf("provider/cloudflare: failed to parse domain %s response: %w", name, err)
-	}
-	return string(data), nil
-}
-
-// GetDomain retrieves a specific domain from Cloudflare
+// GetDomain retrieves a specific domain registration from Cloudflare via the
+// new Registrar API (GET registrations/{domain}).
 func (c *CloudflareProvider) GetDomain(ctx context.Context, name string) (*domains.ManagedDomain, error) {
-	raw, err := c.getDomainRaw(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	dm := parseDomainFromRaw(raw)
-	if dm.Name == "" {
-		dm.Name = name
-	}
-	return &dm, nil
+	return c.purchaseClient().GetRegistration(ctx, name)
 }
 
-// UpdateAutoRenewal updates the auto-renewal setting for a domain
+// UpdateAutoRenewal updates the auto-renewal setting for a domain via the new
+// Registrar API (PATCH registrations/{domain}).
 func (c *CloudflareProvider) UpdateAutoRenewal(ctx context.Context, name string, enabled bool) error {
 	return c.UpdateDomainSettings(ctx, name, domains.DomainSettings{
 		AutoRenew: &enabled,
 	})
 }
 
-// UpdateDomainSettings updates the mutable registrar settings (auto-renew,
-// registrar lock, WHOIS privacy) for a domain. Only non-nil fields are sent.
+// UpdateDomainSettings updates mutable registrar settings. The new Registrar
+// API currently supports auto_renew ONLY: requests touching registrar lock or
+// WHOIS privacy are rejected up front (before any network call) instead of
+// being sent to the deprecated /registrar/domains endpoint.
 func (c *CloudflareProvider) UpdateDomainSettings(ctx context.Context, name string, settings domains.DomainSettings) error {
-	params := registrar.DomainUpdateParams{
-		AccountID: cloudflare.F(c.config.AccountId),
+	if settings.Locked != nil || settings.Privacy != nil {
+		return fmt.Errorf("provider/cloudflare: registrar lock and WHOIS privacy updates are not supported by the current Cloudflare Registrar API; manage them in the Cloudflare dashboard")
 	}
-	if settings.AutoRenew != nil {
-		params.AutoRenew = cloudflare.F(*settings.AutoRenew)
-	}
-	if settings.Locked != nil {
-		params.Locked = cloudflare.F(*settings.Locked)
-	}
-	if settings.Privacy != nil {
-		params.Privacy = cloudflare.F(*settings.Privacy)
+	if settings.AutoRenew == nil {
+		return fmt.Errorf("provider/cloudflare: no settings to update for %s", name)
 	}
 
-	_, err := c.client.Registrar.Domains.Update(ctx, name, params)
-	if err != nil {
-		return fmt.Errorf("provider/cloudflare: failed to update domain %s: %w", name, err)
-	}
-	return nil
+	return c.purchaseClient().UpdateAutoRenew(ctx, name, *settings.AutoRenew)
 }
 
-// GetRenewalInfo retrieves renewal pricing information
+// GetRenewalInfo reports that renewal pricing is unavailable: the new
+// Registrar API registration schema carries no price fields, and fabricating a
+// currency or price would be misleading around billable operations.
 func (c *CloudflareProvider) GetRenewalInfo(ctx context.Context, name string) (*domains.DomainCost, error) {
-	raw, err := c.getDomainRaw(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	data := gjson.Parse(raw)
-	cost := &domains.DomainCost{
-		Currency:     "USD",
-		RenewalPrice: data.Get("renewal_price").Float(),
-	}
-	if transferPrice := data.Get("transfer_price"); transferPrice.Exists() {
-		cost.TransferPrice = transferPrice.Float()
-	}
-	return cost, nil
+	return nil, ErrRenewalPricingUnavailable
 }
 
 // GetNameservers retrieves nameservers for a domain

@@ -204,3 +204,39 @@ type Purchaser interface {
 
 ## Execution handoff
 Plan complete and saved. Ready to execute using subagent-driven-development — dispatch a fresh subagent per task through opencode (Qwen 3.8), with two-stage review (spec compliance then code quality). Confirm model id via `opencode models` before first dispatch. Shall I proceed?
+
+---
+
+## Post-plan addendum (2026-08-23): migrated management commands to the new Registrar API
+
+During pre-merge review we found that the legacy registrar domain-management
+endpoints used by Tasks 3, 4, 9 and 10 (`GET/PUT /accounts/{id}/registrar/domains[...]`,
+the `cloudflare-go` v4 SDK `Registrar.Domains.List/Get/Update`) are **deprecated
+by Cloudflare with end-of-life 2026-09-27**. The plan's "stable mgmt half" was
+therefore not stable.
+
+Migration applied on this branch:
+
+| Command | Old (deprecated) | New |
+| --- | --- | --- |
+| `domains` list / `ListDomains` | `GET /registrar/domains` (SDK) | `GET /registrar/registrations` (cursor pagination, per_page=50) |
+| `domain get` | `GET /registrar/domains/{name}` | `GET /registrar/registrations/{name}` |
+| auto-renew toggle (`domains renew --on/--off`, `domain set --auto-renew`) | `PUT /registrar/domains/{name}` | `PATCH /registrar/registrations/{name}` body `{"auto_renew": bool}` |
+| privacy/lock (`domain set --privacy/--locked`) | `PUT /registrar/domains/{name}` | **No API equivalent yet** — fails fast with a clear error; dashboard-only |
+
+Response-shape consequences of the new registration schema
+(`domain_name, status, created_at, expires_at, auto_renew, locked,
+privacy_mode` — no `name`, no `name_servers`, no `renewal_price`):
+
+- Parsing keys off `domain_name`; nameservers and renewal price are dropped
+  gracefully (empty / nil), never fabricated.
+- `privacy_mode: "redaction"` maps to privacy on; other values map to off.
+- Renewal pricing is reported as unavailable via a sentinel error
+  (`providers.ErrRenewalPricingUnavailable`) and surfaced by `domains renew`
+  as an explicit note instead of a fabricated price.
+
+Open items: Cloudflare may extend PATCH beyond `auto_renew` later; when it
+does, re-enable `--privacy/--locked`. The async update workflow returns a
+WorkflowStatus; terminal failures are surfaced, pending/in_progress are
+treated as accepted. Live validation against the real (billable) API or the
+official Registrar Sandbox is still pending.

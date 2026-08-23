@@ -21,15 +21,18 @@ var (
 // domainSetCmd represents the domain set command
 var domainSetCmd = &cobra.Command{
 	Use:   "set <domain>",
-	Short: "Update domain settings (auto-renew, privacy, lock)",
-	Long: `Update the mutable registrar settings for a domain: auto-renewal, registrar
-lock, and WHOIS privacy. Select the settings to change and the direction
-with --on or --off.
+	Short: "Update domain settings (auto-renew; privacy/lock dashboard-only)",
+	Long: `Update mutable registrar settings for a domain.
+
+Currently only auto-renewal can be changed through the Cloudflare Registrar
+API (PATCH /registrar/registrations). Registrar lock and WHOIS privacy are
+not yet supported by the API: passing --privacy or --locked against
+Cloudflare fails fast with an error instead of calling the API. Manage those
+settings in the Cloudflare dashboard (Domains > Registrations).
 
 Examples:
   indietool domain set example.dev --auto-renew --on
-  indietool domain set example.dev --privacy --off
-  indietool domain set example.dev --locked --privacy --on`,
+  indietool domain set example.dev --auto-renew --off`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if domainSetOn && domainSetOff {
@@ -101,8 +104,8 @@ func init() {
 	domainCmd.AddCommand(domainSetCmd)
 
 	domainSetCmd.Flags().BoolVar(&domainSetAutoRenew, "auto-renew", false, "Change the auto-renewal setting")
-	domainSetCmd.Flags().BoolVar(&domainSetPrivacy, "privacy", false, "Change the WHOIS privacy setting")
-	domainSetCmd.Flags().BoolVar(&domainSetLocked, "locked", false, "Change the registrar lock setting")
+	domainSetCmd.Flags().BoolVar(&domainSetPrivacy, "privacy", false, "Change the WHOIS privacy setting (not supported via the Cloudflare API; dashboard-only)")
+	domainSetCmd.Flags().BoolVar(&domainSetLocked, "locked", false, "Change the registrar lock setting (not supported via the Cloudflare API; dashboard-only)")
 	domainSetCmd.Flags().BoolVar(&domainSetOn, "on", false, "Enable the selected settings")
 	domainSetCmd.Flags().BoolVar(&domainSetOff, "off", false, "Disable the selected settings")
 }

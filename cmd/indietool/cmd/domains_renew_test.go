@@ -9,23 +9,18 @@ import (
 	"testing"
 )
 
-func domainFixtureJSON() string {
+// registrationFixtureJSON mirrors the new Registrar API registration resource
+// (domain_name, status, created_at, expires_at, auto_renew, locked,
+// privacy_mode). Fields absent from that schema are deliberately omitted.
+func registrationFixtureJSON() string {
 	return `{
-		"id": "example.dev",
-		"name": "example.dev",
-		"available": false,
-		"can_register": false,
+		"domain_name": "example.dev",
+		"status": "active",
 		"created_at": "2024-01-01T00:00:00Z",
-		"current_registrar": "Cloudflare, Inc.",
 		"expires_at": "2027-03-01T00:00:00Z",
-		"locked": true,
-		"privacy": true,
 		"auto_renew": true,
-		"renewal_price": 10.11,
-		"name_servers": ["ara.ns.cloudflare.com", "duke.ns.cloudflare.com"],
-		"registry_statuses": "ok,active",
-		"supported_tld": true,
-		"updated_at": "2025-01-01T00:00:00Z"
+		"locked": true,
+		"privacy_mode": "redaction"
 	}`
 }
 
@@ -34,15 +29,15 @@ func writeDomainEnvelope(w http.ResponseWriter, result string) {
 	_, _ = w.Write([]byte(`{"success": true, "errors": [], "messages": [], "result": ` + result + `}`))
 }
 
-func TestDomainsRenewShowsPriceAndStatus(t *testing.T) {
+func TestDomainsRenewShowsStatusWithoutPrice(t *testing.T) {
 	originalAppConfig := appConfig
 	defer func() {
 		appConfig = originalAppConfig
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -64,14 +59,22 @@ func TestDomainsRenewShowsPriceAndStatus(t *testing.T) {
 	if !strings.Contains(out, "example.dev") {
 		t.Errorf("expected domain name in output, got:\n%s", out)
 	}
-	if !strings.Contains(out, "10.11") {
-		t.Errorf("expected renewal price in output, got:\n%s", out)
+	if !strings.Contains(out, "2027-03-01") {
+		t.Errorf("expected expiry in output, got:\n%s", out)
 	}
 	if !strings.Contains(strings.ToLower(out), "auto-renew") {
 		t.Errorf("expected auto-renew status in output, got:\n%s", out)
 	}
+	// The new registrations schema carries no renewal price; it must not be
+	// fabricated.
+	if strings.Contains(out, "0.00") || strings.Contains(out, "USD") || strings.Contains(out, "10.11") {
+		t.Errorf("expected no fabricated renewal price, got:\n%s", out)
+	}
+	if !strings.Contains(out, "not available via the Registrar API") {
+		t.Errorf("expected the pricing-unavailable note, got:\n%s", out)
+	}
 	if !strings.Contains(strings.ToLower(out), "dashboard") {
-		t.Errorf("expected the manual-renewal dashboard note, got:\n%s", out)
+		t.Errorf("expected the dashboard note, got:\n%s", out)
 	}
 }
 
@@ -82,16 +85,18 @@ func TestDomainsRenewToggleOn(t *testing.T) {
 	}()
 
 	var gotMethod string
+	var gotPath string
 	var gotBody string
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
-	mux.HandleFunc("PUT /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
+		gotPath = r.URL.Path
 		body, _ := io.ReadAll(r.Body)
 		gotBody = string(body)
-		writeDomainEnvelope(w, domainFixtureJSON())
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -109,11 +114,18 @@ func TestDomainsRenewToggleOn(t *testing.T) {
 		t.Fatalf("domains renew --on failed: %v", err)
 	}
 
-	if gotMethod != http.MethodPut {
-		t.Errorf("expected a PUT request to toggle auto-renew, got %q", gotMethod)
+	if gotMethod != http.MethodPatch {
+		t.Errorf("expected a PATCH request to toggle auto-renew, got %q", gotMethod)
+	}
+	wantPath := "/accounts/" + testCmdAccountID + "/registrar/registrations/example.dev"
+	if gotPath != wantPath {
+		t.Errorf("expected PATCH path %q, got %q", wantPath, gotPath)
 	}
 	if !strings.Contains(gotBody, `"auto_renew":true`) {
 		t.Errorf("expected auto_renew true in update body, got %q", gotBody)
+	}
+	if strings.Contains(gotBody, "locked") || strings.Contains(gotBody, "privacy") {
+		t.Errorf("PATCH body must carry auto_renew only, got %q", gotBody)
 	}
 	if !strings.Contains(buf.String(), "example.dev") {
 		t.Errorf("expected confirmation output, got:\n%s", buf.String())
@@ -128,13 +140,13 @@ func TestDomainsRenewToggleOff(t *testing.T) {
 
 	var gotBody string
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
-	mux.HandleFunc("PUT /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		gotBody = string(body)
-		writeDomainEnvelope(w, domainFixtureJSON())
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -157,15 +169,15 @@ func TestDomainsRenewToggleOff(t *testing.T) {
 	}
 }
 
-func TestDomainsRenewJSON(t *testing.T) {
+func TestDomainsRenewJSONOmitsUnavailablePrice(t *testing.T) {
 	originalAppConfig := appConfig
 	defer func() {
 		appConfig = originalAppConfig
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -183,23 +195,20 @@ func TestDomainsRenewJSON(t *testing.T) {
 		t.Fatalf("domains renew --json failed: %v", err)
 	}
 
-	var parsed struct {
-		Domain      string  `json:"domain"`
-		AutoRenewal bool    `json:"auto_renewal"`
-		RenewalCost float64 `json:"renewal_cost"`
-		Currency    string  `json:"currency"`
-	}
+	var parsed map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("expected JSON output, got error: %v\noutput:\n%s", err, buf.String())
 	}
-	if parsed.Domain != "example.dev" {
+	if parsed["domain"] != "example.dev" {
 		t.Errorf("unexpected JSON output: %+v", parsed)
 	}
-	if parsed.RenewalCost != 10.11 {
-		t.Errorf("expected renewal_cost 10.11, got %v", parsed.RenewalCost)
-	}
-	if !parsed.AutoRenewal {
+	if parsed["auto_renewal"] != true {
 		t.Error("expected auto_renewal true in JSON output")
+	}
+	for _, key := range []string{"renewal_cost", "currency", "transfer_cost"} {
+		if _, ok := parsed[key]; ok {
+			t.Errorf("expected unavailable key %q to be omitted from JSON output", key)
+		}
 	}
 }
 
@@ -210,8 +219,8 @@ func TestDomainsRenewRejectsConflictingFlags(t *testing.T) {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 

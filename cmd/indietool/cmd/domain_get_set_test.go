@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -16,8 +17,8 @@ func TestDomainGetShowsDetails(t *testing.T) {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -36,7 +37,7 @@ func TestDomainGetShowsDetails(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"example.dev", "2027-03-01", "ara.ns.cloudflare.com", "10.11"} {
+	for _, want := range []string{"example.dev", "2027-03-01"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected output to contain %q, got:\n%s", want, out)
 		}
@@ -47,6 +48,13 @@ func TestDomainGetShowsDetails(t *testing.T) {
 			t.Errorf("expected output to mention %q, got:\n%s", want, out)
 		}
 	}
+	// Fields absent from the new registrations schema must not be fabricated.
+	if strings.Contains(out, "ara.ns.cloudflare.com") {
+		t.Error("expected no nameservers in output (absent from the registrations schema)")
+	}
+	if strings.Contains(out, "10.11") || strings.Contains(out, "USD") {
+		t.Error("expected no renewal price in output (absent from the registrations schema)")
+	}
 }
 
 func TestDomainGetJSON(t *testing.T) {
@@ -56,8 +64,8 @@ func TestDomainGetJSON(t *testing.T) {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -101,13 +109,13 @@ func TestDomainSetAutoRenewOn(t *testing.T) {
 
 	var gotBody string
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
-	mux.HandleFunc("PUT /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		gotBody = string(body)
-		writeDomainEnvelope(w, domainFixtureJSON())
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -133,21 +141,25 @@ func TestDomainSetAutoRenewOn(t *testing.T) {
 	}
 }
 
-func TestDomainSetPrivacyAndLockedOff(t *testing.T) {
+func TestDomainSetPrivacyAndLockedFailFast(t *testing.T) {
 	originalAppConfig := appConfig
 	defer func() {
 		appConfig = originalAppConfig
 	}()
 
-	var gotBody string
+	// Privacy/lock have no equivalent in the new Registrar API (PATCH
+	// supports auto_renew only): the command must fail fast with a clear
+	// message and must not send any mutation request.
+	var mutationCalls int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
-	mux.HandleFunc("PUT /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		gotBody = string(body)
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("/accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			atomic.AddInt32(&mutationCalls, 1)
+		}
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
@@ -161,18 +173,15 @@ func TestDomainSetPrivacyAndLockedOff(t *testing.T) {
 	defer rootCmd.SetErr(nil)
 
 	rootCmd.SetArgs([]string{"domain", "set", "example.dev", "--privacy", "--locked", "--off"})
-	if err := rootCmd.Execute(); err != nil {
-		t.Fatalf("domain set failed: %v", err)
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected an error when updating privacy/lock via the API")
 	}
-
-	if !strings.Contains(gotBody, `"privacy":false`) {
-		t.Errorf("expected privacy false in update body, got %q", gotBody)
+	if !strings.Contains(err.Error(), "not supported by the current Cloudflare Registrar API") {
+		t.Errorf("expected unsupported-setting error, got: %v", err)
 	}
-	if !strings.Contains(gotBody, `"locked":false`) {
-		t.Errorf("expected locked false in update body, got %q", gotBody)
-	}
-	if strings.Contains(gotBody, "auto_renew") {
-		t.Errorf("expected no auto_renew in update body, got %q", gotBody)
+	if n := atomic.LoadInt32(&mutationCalls); n != 0 {
+		t.Errorf("expected no mutation requests for privacy/lock, got %d", n)
 	}
 }
 
@@ -183,8 +192,8 @@ func TestDomainSetRequiresSettingFlag(t *testing.T) {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/domains/example.dev", func(w http.ResponseWriter, r *http.Request) {
-		writeDomainEnvelope(w, domainFixtureJSON())
+	mux.HandleFunc("GET /accounts/"+testCmdAccountID+"/registrar/registrations/example.dev", func(w http.ResponseWriter, r *http.Request) {
+		writeDomainEnvelope(w, registrationFixtureJSON())
 	})
 	startFakeCloudflareAPI(t, mux)
 
