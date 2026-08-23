@@ -240,3 +240,12 @@ does, re-enable `--privacy/--locked`. The async update workflow returns a
 WorkflowStatus; terminal failures are surfaced, pending/in_progress are
 treated as accepted. Live validation against the real (billable) API or the
 official Registrar Sandbox is still pending.
+
+
+## Addendum 2026-08-23: Registrar Sandbox toggle
+
+- Added provider-level "sandbox" config (CLI: indietool config add provider cloudflare --sandbox; yaml: sandbox: true).
+- When enabled, the registrar purchase/management client routes all requests to /accounts/{id}/registrar-sandbox/... (same host, identical workflow semantics; no billing, purchases persist).
+- Scope: registrar endpoints only; the DNS/zones client is unaffected.
+- Sandbox supports com/net only and requires full contact data on register (no Express Mode).
+- Use the sandbox for pre-merge live verification instead of a local mock.

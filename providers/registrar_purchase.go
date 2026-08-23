@@ -55,15 +55,16 @@ func CloudflareAPIBase() string {
 	return defaultCloudflareAPIBase
 }
 
-// RegistrarPurchaseClient is a thin net/http client for the beta Cloudflare
-// Registrar purchase API (domain-check, registrations, registration-status).
-// These endpoints are not part of the vendored cloudflare-go v4.5.1 SDK; this
-// client is kept separate so a future SDK release can replace it without
-// touching the command layer.
+// RegistrarPurchaseClient is a thin net/http client for the Cloudflare
+// Registrar API (domain-check, registrations, registration-status, plus the
+// registration management methods). These endpoints are not part of the
+// vendored cloudflare-go v4.5.1 SDK; this client is kept separate so a future
+// SDK release can replace it without touching the command layer.
 type RegistrarPurchaseClient struct {
 	baseURL    string
 	accountID  string
 	token      string
+	sandbox    bool
 	httpClient *http.Client
 
 	// PreferAsync forces asynchronous registration behaviour by sending the
@@ -72,13 +73,34 @@ type RegistrarPurchaseClient struct {
 }
 
 // NewRegistrarPurchaseClient creates a purchase client for the given account.
-func NewRegistrarPurchaseClient(accountID, token string) *RegistrarPurchaseClient {
+// When sandbox is true, requests target the Registrar Sandbox mirror
+// (/accounts/{id}/registrar-sandbox/... on the same host) — a test environment
+// where purchases are free but persist.
+func NewRegistrarPurchaseClient(accountID, token string, sandbox bool) *RegistrarPurchaseClient {
 	return &RegistrarPurchaseClient{
 		baseURL:    CloudflareAPIBase(),
 		accountID:  accountID,
 		token:      token,
+		sandbox:    sandbox,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
+}
+
+// registrarSegment returns the registrar API path segment for this client.
+// The Registrar Sandbox mirrors every production registrar endpoint under
+// /registrar-sandbox/ instead of /registrar/.
+func (c *RegistrarPurchaseClient) registrarSegment() string {
+	if c.sandbox {
+		return "registrar-sandbox"
+	}
+	return "registrar"
+}
+
+// registrarEndpoint builds an account-scoped registrar API path, routing
+// through the sandbox prefix when sandbox mode is enabled. All registrar
+// request paths must be built through this helper.
+func (c *RegistrarPurchaseClient) registrarEndpoint(resource string) string {
+	return "/accounts/" + c.accountID + "/" + c.registrarSegment() + "/" + resource
 }
 
 // apiErrorEntry is a single error entry from the Cloudflare API envelope.
@@ -353,7 +375,7 @@ func (c *RegistrarPurchaseClient) Check(ctx context.Context, names []string) ([]
 		_, err := c.do(
 			ctx,
 			http.MethodPost,
-			fmt.Sprintf("/accounts/%s/registrar/domain-check", c.accountID),
+			c.registrarEndpoint("domain-check"),
 			map[string]any{"domains": chunk},
 			false,
 			&res,
@@ -378,7 +400,7 @@ func (c *RegistrarPurchaseClient) Register(ctx context.Context, name string) (*d
 	status, err := c.do(
 		ctx,
 		http.MethodPost,
-		fmt.Sprintf("/accounts/%s/registrar/registrations", c.accountID),
+		c.registrarEndpoint("registrations"),
 		map[string]any{"domain_name": name},
 		c.PreferAsync,
 		&res,
@@ -399,7 +421,7 @@ func (c *RegistrarPurchaseClient) RegistrationStatus(ctx context.Context, name s
 	status, err := c.do(
 		ctx,
 		http.MethodGet,
-		fmt.Sprintf("/accounts/%s/registrar/registrations/%s/registration-status", c.accountID, url.PathEscape(name)),
+		c.registrarEndpoint("registrations/"+url.PathEscape(name)+"/registration-status"),
 		nil,
 		false,
 		&res,
@@ -422,7 +444,7 @@ func (c *RegistrarPurchaseClient) GetRegistration(ctx context.Context, name stri
 	if _, err := c.do(
 		ctx,
 		http.MethodGet,
-		fmt.Sprintf("/accounts/%s/registrar/registrations/%s", c.accountID, url.PathEscape(name)),
+		c.registrarEndpoint("registrations/"+url.PathEscape(name)),
 		nil,
 		false,
 		&res,
@@ -448,7 +470,7 @@ func (c *RegistrarPurchaseClient) UpdateAutoRenew(ctx context.Context, name stri
 	if _, err := c.do(
 		ctx,
 		http.MethodPatch,
-		fmt.Sprintf("/accounts/%s/registrar/registrations/%s", c.accountID, url.PathEscape(name)),
+		c.registrarEndpoint("registrations/"+url.PathEscape(name)),
 		map[string]any{"auto_renew": enabled},
 		false,
 		&res,
@@ -485,7 +507,7 @@ func (c *RegistrarPurchaseClient) ListRegistrations(ctx context.Context) ([]doma
 		if _, err := c.call(
 			ctx,
 			http.MethodGet,
-			fmt.Sprintf("/accounts/%s/registrar/registrations?%s", c.accountID, query.Encode()),
+			c.registrarEndpoint("registrations")+"?"+query.Encode(),
 			nil,
 			false,
 			&env,

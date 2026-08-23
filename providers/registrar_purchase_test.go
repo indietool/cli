@@ -18,7 +18,7 @@ func newTestPurchaseClient(t *testing.T, handler http.Handler) *RegistrarPurchas
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	client := NewRegistrarPurchaseClient(testAccountID, "test-token")
+	client := NewRegistrarPurchaseClient(testAccountID, "test-token", false)
 	client.baseURL = srv.URL
 	return client
 }

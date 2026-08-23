@@ -504,6 +504,8 @@ export STRIPE_KEY=$(indietool secret get stripe-key -S)
 
 - **Domains**: Domain registration management, expiry tracking, nameserver updates
 - **Cloudflare Registrar (beta)**: buy domains via API (`domain check` / `domain register`) and manage auto-renew (`domains renew`, `domain get`, `domain set`) through the new Registrar API; privacy/lock remain dashboard-only until the API supports them
+
+**Sandbox testing**: point the Cloudflare provider at the Registrar Sandbox API (test environment, no billing) with "indietool config add provider cloudflare --sandbox" (or "sandbox: true" in the provider config). The sandbox mirrors the production Registrar API under /registrar-sandbox/... and supports only com/net; purchases are free but persist. It requires an API token with Registrar Sandbox permissions and full contact data on register (no Express Mode).
 - **DNS**: DNS record management (list, create, update, delete) with ID-based targeting
 - **Secrets**: Local encrypted secret storage (OS keyring or age-ssh backend)
 

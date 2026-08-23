@@ -12,6 +12,7 @@ var (
 	cloudflareAPIToken  string
 	cloudflareEmail     string
 	cloudflareAccountID string
+	cloudflareSandbox   bool
 )
 
 // configAddProviderCloudflareCmd represents the config add provider cloudflare command
@@ -27,7 +28,8 @@ You can obtain your API token from your Cloudflare dashboard. The account ID
 is shown on the dashboard Overview page (or in the URL) and is required for
 registrar operations such as listing, buying, and renewing domains.`,
 	Example: `  indietool config add provider cloudflare --api-token YOUR_API_TOKEN --account-id YOUR_ACCOUNT_ID
-  indietool config add provider cloudflare --api-token YOUR_API_TOKEN --account-id YOUR_ACCOUNT_ID --email you@example.com`,
+  indietool config add provider cloudflare --api-token YOUR_API_TOKEN --account-id YOUR_ACCOUNT_ID --email you@example.com
+  indietool config add provider cloudflare --api-token YOUR_API_TOKEN --account-id YOUR_ACCOUNT_ID --sandbox   # Registrar Sandbox test environment`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate required flags
 		if cloudflareAPIToken == "" {
@@ -48,6 +50,7 @@ registrar operations such as listing, buying, and renewing domains.`,
 			AccountId: cloudflareAccountID,
 			APIToken:  cloudflareAPIToken,
 			Email:     cloudflareEmail,
+			Sandbox:   cloudflareSandbox,
 			Enabled:   true,
 		}
 
@@ -67,6 +70,7 @@ func init() {
 	configAddProviderCloudflareCmd.Flags().StringVar(&cloudflareAPIToken, "api-token", "", "Cloudflare API token (required)")
 	configAddProviderCloudflareCmd.Flags().StringVar(&cloudflareAccountID, "account-id", "", "Cloudflare account ID (required for registrar operations)")
 	configAddProviderCloudflareCmd.Flags().StringVar(&cloudflareEmail, "email", "", "Cloudflare account email")
+	configAddProviderCloudflareCmd.Flags().BoolVar(&cloudflareSandbox, "sandbox", false, "Use Cloudflare Registrar Sandbox API (test environment, no billing)")
 
 	// Mark required flags
 	configAddProviderCloudflareCmd.MarkFlagRequired("api-token")

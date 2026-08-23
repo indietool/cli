@@ -20,6 +20,7 @@ type CloudflareConfig struct {
 	APIToken  string `yaml:"api_token"`
 	APIKey    string `yaml:"api_key"`
 	Email     string `yaml:"email"`
+	Sandbox   bool   `yaml:"sandbox"`
 	Enabled   bool   `yaml:"enabled"`
 }
 
@@ -103,10 +104,13 @@ func (c *CloudflareProvider) AsRegistrar() domains.Registrar {
 	return c
 }
 
-// purchaseClient lazily builds the beta registrar purchase API client.
+// purchaseClient lazily builds the registrar purchase API client. When the
+// config enables sandbox mode, requests target Cloudflare's Registrar Sandbox
+// mirror (/registrar-sandbox/...) — a test environment without billing. The
+// DNS/zones client is unaffected: the sandbox mirrors registrar endpoints only.
 func (c *CloudflareProvider) purchaseClient() *RegistrarPurchaseClient {
 	if c.purchaser == nil {
-		c.purchaser = NewRegistrarPurchaseClient(c.config.AccountId, c.config.APIToken)
+		c.purchaser = NewRegistrarPurchaseClient(c.config.AccountId, c.config.APIToken, c.config.Sandbox)
 	}
 	return c.purchaser
 }
