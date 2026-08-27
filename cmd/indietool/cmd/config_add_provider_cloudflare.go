@@ -47,6 +47,16 @@ You can obtain your API token from your Cloudflare dashboard.`,
 		// Set the Cloudflare config
 		cfg.Providers.Cloudflare = cloudflareConfig
 
+		if jsonOutput {
+			return printJSON(map[string]interface{}{
+				"status":   "success",
+				"provider": "cloudflare",
+				"enabled":  true,
+				"email":    cloudflareEmail,
+				"message":  "Successfully added and enabled Cloudflare provider configuration",
+			})
+		}
+
 		log.Info("Successfully added and enabled Cloudflare provider configuration")
 
 		return nil

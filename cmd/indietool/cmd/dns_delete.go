@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/indietool/cli/dns"
-	"github.com/indietool/cli/indietool"
 	"os"
 	"strings"
+
+	"github.com/indietool/cli/dns"
+	"github.com/indietool/cli/indietool"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
@@ -18,7 +19,19 @@ var (
 	dnsDeleteForce    bool
 	dnsDeleteType     string
 	dnsDeleteID       string
+	dnsDeleteDryRun   bool
 )
+
+type dnsDeleteResultJSON struct {
+	Status   string       `json:"status"` // "success", "dry-run", "cancelled"
+	DryRun   bool         `json:"dry_run"`
+	Domain   string       `json:"domain"`
+	Provider string       `json:"provider,omitempty"`
+	Deleted  int          `json:"deleted"`
+	Records  []dns.Record `json:"records"`
+	Message  string       `json:"message"`
+	Errors   []string     `json:"errors,omitempty"`
+}
 
 var dnsDeleteCmd = &cobra.Command{
 	Use:   "delete <domain> <name> [type]",
@@ -32,7 +45,9 @@ Examples:
   indietool dns delete example.com api --type CNAME
   indietool dns delete example.com test --id 123abc
   indietool dns delete example.com @ MX --force
-  indietool dns delete example.com subdomain`,
+  indietool dns delete example.com subdomain
+  indietool dns delete example.com www A --dry-run
+  indietool dns delete example.com www A --json`,
 	Args: cobra.RangeArgs(2, 3),
 	RunE: runDNSDelete,
 }
@@ -42,6 +57,7 @@ func init() {
 	dnsDeleteCmd.Flags().BoolVarP(&dnsDeleteForce, "force", "f", false, "Delete without confirmation")
 	dnsDeleteCmd.Flags().StringVar(&dnsDeleteType, "type", "", "Record type filter")
 	dnsDeleteCmd.Flags().StringVar(&dnsDeleteID, "id", "", "Record ID to delete (use with --wide to find IDs)")
+	dnsDeleteCmd.Flags().BoolVar(&dnsDeleteDryRun, "dry-run", false, "Show planned deletions without applying them")
 
 	// Add to parent dns command
 	dnsCmd.AddCommand(dnsDeleteCmd)
@@ -67,8 +83,8 @@ func runDNSDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Show DNS provider
-	if resolvedProvider != "" {
+	// Show DNS provider (human mode only)
+	if !jsonOutput && resolvedProvider != "" {
 		fmt.Printf("DNS Provider: %s\n", resolvedProvider)
 	}
 
@@ -86,11 +102,31 @@ func runDNSDelete(cmd *cobra.Command, args []string) error {
 		if len(filters) > 0 {
 			errorMsg += " with " + strings.Join(filters, " and ")
 		}
-		return fmt.Errorf(errorMsg)
+		return fmt.Errorf("%s", errorMsg)
 	}
 
-	// Show confirmation unless --force
-	if !dnsDeleteForce {
+	if dnsDeleteDryRun {
+		msg := fmt.Sprintf("Would delete %d DNS record(s)", len(recordsToDelete))
+		if jsonOutput {
+			return printJSON(dnsDeleteResultJSON{
+				Status:   "dry-run",
+				DryRun:   true,
+				Domain:   domain,
+				Provider: resolvedProvider,
+				Deleted:  0,
+				Records:  recordsToDelete,
+				Message:  msg,
+			})
+		}
+		fmt.Printf("[dry-run] %s:\n", msg)
+		for _, record := range recordsToDelete {
+			fmt.Printf("  - %s %s %s\n", record.Name, record.Type, record.Content)
+		}
+		return nil
+	}
+
+	// Skip confirmation in JSON mode (scriptable) or with --force
+	if !dnsDeleteForce && !jsonOutput {
 		if !confirmDeletion(recordsToDelete) {
 			fmt.Println("Delete cancelled")
 			return nil
@@ -98,7 +134,7 @@ func runDNSDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute deletions
-	return executeDeletions(domain, recordsToDelete)
+	return executeDeletions(domain, resolvedProvider, recordsToDelete)
 }
 
 func findRecordsForDeletion(domain, name, recordType, recordID string) ([]dns.Record, string, error) {
@@ -117,14 +153,19 @@ func findRecordsForDeletion(domain, name, recordType, recordID string) ([]dns.Re
 	// Create DNS manager
 	manager := dns.NewManager(dnsProviders)
 
+	providerFlag := dnsDeleteProvider
+	if providerFlag == "" {
+		providerFlag = GetDNSProvider()
+	}
+
 	// List all records for the domain
-	records, detectionResult, err := manager.ListRecords(context.Background(), domain, dnsDeleteProvider)
+	records, detectionResult, err := manager.ListRecords(context.Background(), domain, providerFlag)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to list DNS records: %w", err)
 	}
 
 	// Resolve provider name from flag or detection
-	resolvedProvider := dnsDeleteProvider
+	resolvedProvider := providerFlag
 	if detectionResult != nil {
 		if detectionResult.Provider != "" {
 			log.Debugf("Detected DNS provider: %s (confidence: %s)", detectionResult.Provider, detectionResult.Confidence)
@@ -209,7 +250,7 @@ func confirmDeletion(records []dns.Record) bool {
 	return response == "y" || response == "yes"
 }
 
-func executeDeletions(domain string, records []dns.Record) error {
+func executeDeletions(domain, resolvedProvider string, records []dns.Record) error {
 	// Get the global provider registry
 	registry := GetProviderRegistry()
 	if registry == nil {
@@ -224,19 +265,51 @@ func executeDeletions(domain string, records []dns.Record) error {
 
 	manager := dns.NewManager(dnsProviders)
 
+	providerFlag := dnsDeleteProvider
+	if providerFlag == "" {
+		providerFlag = GetDNSProvider()
+	}
+
 	// Delete each record
 	var errors []string
 	successCount := 0
+	var deleted []dns.Record
 
 	for _, record := range records {
-		err := manager.DeleteRecord(context.Background(), domain, dnsDeleteProvider, record.ID)
+		err := manager.DeleteRecord(context.Background(), domain, providerFlag, record.ID)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to delete record %s %s: %v",
 				record.Name, record.Type, err))
 			continue
 		}
 		successCount++
+		deleted = append(deleted, record)
 		log.Debugf("Successfully deleted DNS record: %s %s %s", record.Name, record.Type, record.Content)
+	}
+
+	if jsonOutput {
+		status := "success"
+		msg := fmt.Sprintf("Deleted %d DNS record(s)", successCount)
+		if len(errors) > 0 {
+			status = "error"
+			msg = fmt.Sprintf("failed to delete %d records", len(errors))
+		}
+		if err := printJSON(dnsDeleteResultJSON{
+			Status:   status,
+			DryRun:   false,
+			Domain:   domain,
+			Provider: resolvedProvider,
+			Deleted:  successCount,
+			Records:  deleted,
+			Message:  msg,
+			Errors:   errors,
+		}); err != nil {
+			return err
+		}
+		if len(errors) > 0 {
+			return fmt.Errorf("failed to delete %d records", len(errors))
+		}
+		return nil
 	}
 
 	// Report results

@@ -10,8 +10,13 @@ import (
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(GetVersion())
+	RunE: func(cmd *cobra.Command, args []string) error {
+		v := GetVersion()
+		if jsonOutput {
+			return printJSON(map[string]string{"version": v})
+		}
+		fmt.Println(v)
+		return nil
 	},
 }
 

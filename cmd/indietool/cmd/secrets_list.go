@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/indietool/cli/indietool/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretsListCmd = &cobra.Command{
@@ -16,6 +17,22 @@ var secretsListCmd = &cobra.Command{
 	Long:  "List all secrets in the database. Values are never displayed for security. Use @database to list secrets from a specific database.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  listSecrets,
+}
+
+type secretListItemJSON struct {
+	Name      string     `json:"name"`
+	Note      string     `json:"note,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Status    string     `json:"status"`
+	Expired   bool       `json:"expired"`
+}
+
+type secretsListResultJSON struct {
+	Database string               `json:"database"`
+	Total    int                  `json:"total"`
+	Secrets  []secretListItemJSON `json:"secrets"`
 }
 
 func init() {
@@ -58,6 +75,13 @@ func listSecrets(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		// Check if it's the specific "database not found" error
 		if errors.Is(err, secrets.ErrSecretDBNotFound) {
+			if jsonOutput {
+				return printJSON(secretsListResultJSON{
+					Database: database,
+					Total:    0,
+					Secrets:  []secretListItemJSON{},
+				})
+			}
 			fmt.Println("No secrets found. Create one with `secrets set name mypassword`")
 			return nil
 		}
@@ -65,6 +89,13 @@ func listSecrets(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(secretsList) == 0 {
+		if jsonOutput {
+			return printJSON(secretsListResultJSON{
+				Database: database,
+				Total:    0,
+				Secrets:  []secretListItemJSON{},
+			})
+		}
 		fmt.Printf("No secrets found in database '%s'\n", database)
 		fmt.Println("Use 'indietool secrets set <name> <value>' to add a secret")
 		return nil
@@ -74,6 +105,35 @@ func listSecrets(cmd *cobra.Command, args []string) error {
 	sort.Slice(secretsList, func(i, j int) bool {
 		return secretsList[i].Name < secretsList[j].Name
 	})
+
+	if jsonOutput {
+		items := make([]secretListItemJSON, 0, len(secretsList))
+		for _, secret := range secretsList {
+			status := "OK"
+			if secret.Expired {
+				status = "EXPIRED"
+			} else if secret.ExpiresAt != nil {
+				status = "EXPIRES"
+			}
+			item := secretListItemJSON{
+				Name:      secret.Name,
+				CreatedAt: secret.CreatedAt,
+				UpdatedAt: secret.UpdatedAt,
+				ExpiresAt: secret.ExpiresAt,
+				Status:    status,
+				Expired:   secret.Expired,
+			}
+			if showNotes {
+				item.Note = secret.Note
+			}
+			items = append(items, item)
+		}
+		return printJSON(secretsListResultJSON{
+			Database: database,
+			Total:    len(items),
+			Secrets:  items,
+		})
+	}
 
 	// Display results
 	fmt.Printf("Secrets in database '%s':\n\n", database)

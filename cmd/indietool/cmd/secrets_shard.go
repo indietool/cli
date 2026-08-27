@@ -1,12 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/indietool/cli/indietool/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretsShardCmd = &cobra.Command{
@@ -85,17 +84,14 @@ func shardSecret(cmd *cobra.Command, args []string) error {
 	}
 
 	if jsonOutput {
-		result := map[string]interface{}{
+		return printJSON(map[string]interface{}{
 			"status":      "success",
 			"file":        filename,
 			"shards":      n,
 			"threshold":   threshold,
 			"output_dir":  outDir,
 			"shard_files": written,
-		}
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(result)
+		})
 	}
 
 	fmt.Fprintf(os.Stderr, "Sharded %s into %d shards (threshold: %d)\n", filename, n, threshold)

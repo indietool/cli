@@ -57,6 +57,14 @@ func exportSecrets(cmd *cobra.Command, args []string) error {
 	noPassphrase, _ := cmd.Flags().GetBool("no-passphrase")
 	outFile, _ := cmd.Flags().GetString("out")
 
+	// --json implies plaintext JSON on stdout (scriptable export)
+	if jsonOutput {
+		noPassphrase = true
+		if outFile == "" {
+			// keep stdout
+		}
+	}
+
 	secretsConfig := cfg.GetSecretsConfig()
 	defaultDB := secretsConfig.GetDefaultDatabase()
 
@@ -152,9 +160,31 @@ func exportSecrets(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
-	// Summary always goes to stderr so it doesn't pollute stdout when piping
-	printExportSummary(data.Databases)
+	// When writing JSON export to stdout, skip human summary to keep stream pure.
+	// When --json with --out, emit a small status object on stdout after write
+	// only if the export itself did not already go to stdout.
+	if jsonOutput && outFile != "" {
+		return printJSON(map[string]interface{}{
+			"status":    "success",
+			"out":       outFile,
+			"encrypted": !noPassphrase,
+			"databases": exportDBCounts(data.Databases),
+		})
+	}
+
+	if !(jsonOutput && outFile == "") {
+		// Summary always goes to stderr so it doesn't pollute stdout when piping
+		printExportSummary(data.Databases)
+	}
 	return nil
+}
+
+func exportDBCounts(databases map[string][]*secrets.Secret) map[string]int {
+	counts := make(map[string]int, len(databases))
+	for db, secretsList := range databases {
+		counts[db] = len(secretsList)
+	}
+	return counts
 }
 
 func printExportSummary(databases map[string][]*secrets.Secret) {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/indietool/cli/indietool/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretsInitCmd = &cobra.Command{
@@ -15,6 +15,14 @@ var secretsInitCmd = &cobra.Command{
 	Long:  "Initialize encryption key for the secrets database. If no key-path is provided, a new key will be generated.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  initSecrets,
+}
+
+type secretInitJSON struct {
+	Status   string `json:"status"`
+	Database string `json:"database"`
+	Backend  string `json:"backend,omitempty"`
+	KeyPath  string `json:"key_path,omitempty"`
+	Message  string `json:"message"`
 }
 
 func init() {
@@ -64,10 +72,12 @@ func initSecrets(cmd *cobra.Command, args []string) error {
 
 	// Check if key already exists
 	if manager.HasDatabaseKey(database) {
-		fmt.Printf("⚠️  WARNING: An encryption key already exists for database '%s'\n", database)
-		fmt.Println("   Reinitializing will replace the existing key and make current secrets inaccessible.")
-		fmt.Println("   If you have existing secrets, they will become permanently unreadable.")
-		fmt.Println("   To proceed anyway, first delete the existing key or use a different database name.")
+		if !jsonOutput {
+			fmt.Printf("⚠️  WARNING: An encryption key already exists for database '%s'\n", database)
+			fmt.Println("   Reinitializing will replace the existing key and make current secrets inaccessible.")
+			fmt.Println("   If you have existing secrets, they will become permanently unreadable.")
+			fmt.Println("   To proceed anyway, first delete the existing key or use a different database name.")
+		}
 		return fmt.Errorf("refusing to overwrite existing encryption key")
 	}
 
@@ -97,28 +107,42 @@ func initSecrets(cmd *cobra.Command, args []string) error {
 			cfg.Secrets.SSHPrivateKeyPath = sshPrivateKey
 		}
 		if err := cfg.SaveConfig(cfg.Path); err != nil {
-			fmt.Printf("⚠ Failed to save backend preference to config: %v\n", err)
-		} else {
+			if !jsonOutput {
+				fmt.Printf("⚠ Failed to save backend preference to config: %v\n", err)
+			}
+		} else if !jsonOutput {
 			fmt.Printf("✓ Backend '%s' recorded in config\n", backend)
 		}
 	}
 
+	var msg string
 	switch backend {
 	case "age-ssh":
-		fmt.Printf("✓ Encryption key stored as age-ssh file (SSH key: %s)\n", secretsConfig.SSHPublicKeyPath)
+		msg = fmt.Sprintf("Encryption key stored as age-ssh file (SSH key: %s)", secretsConfig.SSHPublicKeyPath)
 	case "keyring":
 		if keyPath != "" {
-			fmt.Printf("✓ Encryption key loaded from '%s' for database '%s'\n", keyPath, database)
+			msg = fmt.Sprintf("Encryption key loaded from '%s' for database '%s'", keyPath, database)
 		} else {
-			fmt.Printf("✓ New encryption key generated for database '%s'\n", database)
+			msg = fmt.Sprintf("New encryption key generated for database '%s'", database)
 		}
 	default:
 		if keyPath != "" {
-			fmt.Printf("✓ Encryption key loaded from '%s' for database '%s'\n", keyPath, database)
+			msg = fmt.Sprintf("Encryption key loaded from '%s' for database '%s'", keyPath, database)
 		} else {
-			fmt.Printf("✓ New encryption key generated for database '%s'\n", database)
+			msg = fmt.Sprintf("New encryption key generated for database '%s'", database)
 		}
 	}
 
+	if jsonOutput {
+		return printJSON(secretInitJSON{
+			Status:   "success",
+			Database: database,
+			Backend:  backend,
+			KeyPath:  keyPath,
+			Message:  msg,
+		})
+	}
+
+	fmt.Printf("✓ %s\n", msg)
 	return nil
 }

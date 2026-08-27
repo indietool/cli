@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/indietool/cli/domains"
-	"github.com/indietool/cli/output"
 	"os"
 	"strings"
+
+	"github.com/indietool/cli/domains"
+	"github.com/indietool/cli/output"
 
 	"github.com/spf13/cobra"
 )
@@ -47,11 +48,10 @@ Examples:
   indietool domain explore webapp --tlds @tlds.txt
   indietool domain explore myapp --wide --no-color`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		input := strings.TrimSpace(strings.ToLower(args[0]))
 		if input == "" {
-			fmt.Fprintf(os.Stderr, "Domain name cannot be empty\n")
-			os.Exit(1)
+			return fmt.Errorf("domain name cannot be empty")
 		}
 
 		// Extract base domain name (remove TLD if present)
@@ -63,8 +63,7 @@ Examples:
 			var err error
 			tlds, err = domains.ParseTLDs(customTLDs)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error parsing TLDs: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error parsing TLDs: %w", err)
 			}
 		}
 
@@ -94,9 +93,9 @@ Examples:
 		table.AddRows(rows)
 
 		if err := table.RenderWithSummary(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error rendering table: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error rendering table: %w", err)
 		}
+		return nil
 	},
 }
 

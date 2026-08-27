@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/indietool/cli/indietool/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretsDbListCmd = &cobra.Command{
@@ -12,6 +12,12 @@ var secretsDbListCmd = &cobra.Command{
 	Short: "List all secrets databases",
 	Long:  "List all existing secrets databases with their names.",
 	RunE:  listDatabases,
+}
+
+type secretsDBListJSON struct {
+	Default   string   `json:"default"`
+	Databases []string `json:"databases"`
+	Total     int      `json:"total"`
 }
 
 func listDatabases(cmd *cobra.Command, args []string) error {
@@ -31,12 +37,24 @@ func listDatabases(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to list databases: %w", err)
 	}
 
+	defaultDb := secretsConfig.GetDefaultDatabase()
+
+	if jsonOutput {
+		if databases == nil {
+			databases = []string{}
+		}
+		return printJSON(secretsDBListJSON{
+			Default:   defaultDb,
+			Databases: databases,
+			Total:     len(databases),
+		})
+	}
+
 	if len(databases) == 0 {
 		fmt.Println("No secrets databases found.")
 		return nil
 	}
 
-	defaultDb := secretsConfig.GetDefaultDatabase()
 	fmt.Println("Available secrets databases:")
 	for _, db := range databases {
 		if db == defaultDb {
