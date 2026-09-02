@@ -395,13 +395,22 @@ func (c *RegistrarPurchaseClient) Check(ctx context.Context, names []string) ([]
 // Register starts a domain registration workflow. This is billable and
 // non-refundable once completed. The response is either 201 Created
 // (completed) or 202 Accepted (still in progress; poll RegistrationStatus).
-func (c *RegistrarPurchaseClient) Register(ctx context.Context, name string) (*domains.RegistrationResult, error) {
+//
+// When contact is non-nil it is sent as contacts.registrant (the Registrar
+// Sandbox requires it; production Express-mode accounts do not). A nil
+// contact omits the field entirely so the API falls back to the account's
+// default address book entry.
+func (c *RegistrarPurchaseClient) Register(ctx context.Context, name string, contact *domains.RegistrantContact) (*domains.RegistrationResult, error) {
+	payload := map[string]any{"domain_name": name}
+	if contact != nil {
+		payload["contacts"] = map[string]any{"registrant": contact}
+	}
 	var res registrationResource
 	status, err := c.do(
 		ctx,
 		http.MethodPost,
 		c.registrarEndpoint("registrations"),
-		map[string]any{"domain_name": name},
+		payload,
 		c.PreferAsync,
 		&res,
 	)

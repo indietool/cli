@@ -157,7 +157,7 @@ func TestPurchaseRegisterCompleted(t *testing.T) {
 
 	client := newTestPurchaseClient(t, handler)
 
-	res, err := client.Register(context.Background(), "example.dev")
+	res, err := client.Register(context.Background(), "example.dev", nil)
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestPurchaseRegisterInProgress(t *testing.T) {
 
 	client := newTestPurchaseClient(t, handler)
 
-	res, err := client.Register(context.Background(), "example.dev")
+	res, err := client.Register(context.Background(), "example.dev", nil)
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestPurchaseRegisterSendsAsyncPreference(t *testing.T) {
 	client := newTestPurchaseClient(t, handler)
 	client.PreferAsync = true
 
-	if _, err := client.Register(context.Background(), "example.dev"); err != nil {
+	if _, err := client.Register(context.Background(), "example.dev", nil); err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
 
@@ -289,7 +289,7 @@ func TestPurchaseAPIError(t *testing.T) {
 
 	client := newTestPurchaseClient(t, handler)
 
-	_, err := client.Register(context.Background(), "example.dev")
+	_, err := client.Register(context.Background(), "example.dev", nil)
 	if err == nil {
 		t.Fatal("expected an error for an unsuccessful API response")
 	}

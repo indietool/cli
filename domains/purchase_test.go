@@ -38,7 +38,7 @@ func (p *purchaserRegistrar) Check(ctx context.Context, names []string) ([]Avail
 	return []Availability{{Name: names[0], Registrable: true}}, nil
 }
 
-func (p *purchaserRegistrar) Register(ctx context.Context, name string) (*RegistrationResult, error) {
+func (p *purchaserRegistrar) Register(ctx context.Context, name string, contact *RegistrantContact) (*RegistrationResult, error) {
 	return &RegistrationResult{DomainName: name, State: RegistrationStateSucceeded, Completed: true}, nil
 }
 

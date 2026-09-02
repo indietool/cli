@@ -47,12 +47,40 @@ func (r *RegistrationResult) IsTerminal() bool {
 	}
 }
 
+// PostalAddress is the registrant's postal address as required by registrar
+// registration payloads. CountryCode is ISO 3166-1 alpha-2.
+type PostalAddress struct {
+	Street      string `json:"street,omitempty"`
+	City        string `json:"city,omitempty"`
+	State       string `json:"state,omitempty"`
+	PostalCode  string `json:"postal_code,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
+}
+
+// PostalInfo is the registrant's named postal record.
+type PostalInfo struct {
+	Name         string         `json:"name,omitempty"`
+	Organization string         `json:"organization,omitempty"`
+	Address      *PostalAddress `json:"address,omitempty"`
+}
+
+// RegistrantContact carries the registrant contact data required by
+// registrars without an account-level address book (e.g. the Cloudflare
+// Registrar Sandbox). Phone uses the "+<cc>.<number>" format (e.g.
+// "+1.5555551234"). JSON tags mirror the Cloudflare registration schema.
+type RegistrantContact struct {
+	Phone      string      `json:"phone,omitempty"`
+	Email      string      `json:"email,omitempty"`
+	Fax        string      `json:"fax,omitempty"`
+	PostalInfo *PostalInfo `json:"postal_info,omitempty"`
+}
+
 // Purchaser is an optional capability for registrars that support buying
 // domains (real-time availability checks and registration). Use AsPurchaser
 // to type-assert a Registrar.
 type Purchaser interface {
 	Check(ctx context.Context, names []string) ([]Availability, error)
-	Register(ctx context.Context, name string) (*RegistrationResult, error)
+	Register(ctx context.Context, name string, contact *RegistrantContact) (*RegistrationResult, error)
 	RegistrationStatus(ctx context.Context, name string) (*RegistrationResult, error)
 }
 

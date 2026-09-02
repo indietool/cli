@@ -53,7 +53,7 @@ func TestPurchaseSandboxPathPrefix(t *testing.T) {
 	if _, err := client.Check(context.Background(), []string{"example.dev"}); err != nil {
 		t.Fatalf("Check returned error: %v", err)
 	}
-	if _, err := client.Register(context.Background(), "example.dev"); err != nil {
+	if _, err := client.Register(context.Background(), "example.dev", nil); err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
 	if _, err := client.RegistrationStatus(context.Background(), "example.dev"); err != nil {

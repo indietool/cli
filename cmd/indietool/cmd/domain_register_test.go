@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -287,5 +288,107 @@ func TestDomainRegisterCommandRejectsNonRegistrable(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "extension_not_supported_via_api") {
 		t.Errorf("expected the reason in the error, got: %v", err)
+	}
+}
+
+func TestDomainRegisterCommandPartialContactFlags(t *testing.T) {
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	defer rootCmd.SetOut(nil)
+	defer rootCmd.SetErr(nil)
+
+	rootCmd.SetArgs([]string{"domain", "register", "example.dev", "--yes", "--contact-name", "Jane Doe"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected an error for incomplete contact flags")
+	}
+	if !strings.Contains(err.Error(), "--contact-email") {
+		t.Errorf("expected the missing flags to be named, got: %v", err)
+	}
+}
+
+func TestDomainRegisterCommandWithContactFlags(t *testing.T) {
+	originalAppConfig := appConfig
+	defer func() {
+		appConfig = originalAppConfig
+	}()
+
+	originalInterval := registerPollInterval
+	registerPollInterval = time.Millisecond
+	defer func() { registerPollInterval = originalInterval }()
+
+	var registerCalls int32
+	contactCh := make(chan map[string]any, 1)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /accounts/"+testCmdAccountID+"/registrar/domain-check", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"success": true, "errors": [], "messages": [],
+			"result": {"domains": [{
+				"name": "example.dev",
+				"registrable": true,
+				"pricing": {"currency": "USD", "registration_cost": "10.11", "renewal_cost": "10.11"}
+			}]}
+		}`))
+	})
+	mux.HandleFunc("POST /accounts/"+testCmdAccountID+"/registrar/registrations", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&registerCalls, 1)
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode registration body: %v", err)
+		}
+		contactCh <- body
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success": true, "errors": [], "messages": [], "result": {"domain_name": "example.dev", "state": "succeeded", "completed": true}}`))
+	})
+	startFakeCloudflareAPI(t, mux)
+
+	configPath := newTestConfigFile(t)
+	configureCloudflareForCmdTests(t, configPath)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	defer rootCmd.SetOut(nil)
+	defer rootCmd.SetErr(nil)
+
+	rootCmd.SetArgs([]string{
+		"domain", "register", "example.dev", "--yes",
+		"--contact-name", "Jane Doe",
+		"--contact-email", "jane@example.com",
+		"--contact-phone", "+1.5555551234",
+		"--contact-street", "1 Main St",
+		"--contact-city", "Springfield",
+		"--contact-state", "CA",
+		"--contact-postal-code", "90210",
+		"--contact-country", "us",
+	})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("domain register with contact flags failed: %v", err)
+	}
+	if atomic.LoadInt32(&registerCalls) != 1 {
+		t.Errorf("expected exactly 1 registration call, got %d", registerCalls)
+	}
+
+	var gotContact map[string]any
+	select {
+	case gotContact = <-contactCh:
+	case <-time.After(time.Second):
+		t.Fatal("no registration body captured")
+	}
+
+	contacts, _ := gotContact["contacts"].(map[string]any)
+	reg, _ := contacts["registrant"].(map[string]any)
+	postal, _ := reg["postal_info"].(map[string]any)
+	addr, _ := postal["address"].(map[string]any)
+	if addr == nil || addr["country_code"] != "US" {
+		t.Errorf("expected normalized country_code US in the registration payload, got: %v", gotContact)
+	}
+	if reg == nil || reg["phone"] != "+1.5555551234" || reg["email"] != "jane@example.com" {
+		t.Errorf("unexpected registrant contact in payload: %v", reg)
+	}
+	if postal == nil || postal["name"] != "Jane Doe" {
+		t.Errorf("unexpected postal name in payload: %v", postal)
 	}
 }

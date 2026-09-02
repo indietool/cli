@@ -123,8 +123,8 @@ func (c *CloudflareProvider) Check(ctx context.Context, names []string) ([]domai
 
 // Register implements the domains.Purchaser capability using the beta
 // Cloudflare Registrar purchase API. Billable and non-refundable.
-func (c *CloudflareProvider) Register(ctx context.Context, name string) (*domains.RegistrationResult, error) {
-	return c.purchaseClient().Register(ctx, name)
+func (c *CloudflareProvider) Register(ctx context.Context, name string, contact *domains.RegistrantContact) (*domains.RegistrationResult, error) {
+	return c.purchaseClient().Register(ctx, name, contact)
 }
 
 // RegistrationStatus implements the domains.Purchaser capability by polling
