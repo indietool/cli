@@ -74,17 +74,26 @@ var DomainTableConfig = output.TableConfig{
 		healthy, warning, critical, expired := 0, 0, 0, 0
 
 		for _, row := range rows {
-			if status, ok := row["status"].(string); ok {
-				switch DomainStatus(strings.ToLower(status)) {
-				case StatusHealthy:
-					healthy++
-				case StatusWarning:
-					warning++
-				case StatusCritical:
-					critical++
-				case StatusExpired:
-					expired++
-				}
+			// Rows built from ManagedDomain carry the typed DomainStatus value,
+			// not a plain string — accept both or every count reads as zero.
+			var status DomainStatus
+			switch v := row["status"].(type) {
+			case string:
+				status = DomainStatus(strings.ToLower(v))
+			case DomainStatus:
+				status = v
+			default:
+				continue
+			}
+			switch status {
+			case StatusHealthy:
+				healthy++
+			case StatusWarning:
+				warning++
+			case StatusCritical:
+				critical++
+			case StatusExpired:
+				expired++
 			}
 		}
 

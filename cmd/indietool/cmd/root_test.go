@@ -1,10 +1,12 @@
 package cmd
 
 import (
-	"github.com/indietool/cli/config"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/indietool/cli/indietool"
 )
 
 // TestConfigIntegration tests the complete config loading flow
@@ -13,18 +15,17 @@ func TestConfigIntegration(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "test-config.yaml")
 
-	testConfig := `domains:
-  registrars:
-    cloudflare:
-      api_key: "test-cf-key"
-      email: "test@example.com"
-      enabled: true
-    namecheap:
-      api_key: "test-nc-key"
-      api_secret: "test-nc-secret"
-      username: "test-user"
-      sandbox: true
-      enabled: false
+	testConfig := `providers:
+  cloudflare:
+    account_id: "test-account-id"
+    api_token: "test-cf-token"
+    enabled: true
+  namecheap:
+    api_key: "test-nc-key"
+    username: "test-user"
+    sandbox: true
+    enabled: false
+domains:
   management:
     expiry_warning_days: [30, 7, 1]
 `
@@ -35,7 +36,7 @@ func TestConfigIntegration(t *testing.T) {
 	}
 
 	// Test the config loading function directly
-	cfg, err := config.LoadConfigFromPath(configPath)
+	cfg, err := indietool.LoadFromPath(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -51,40 +52,36 @@ func TestConfigIntegration(t *testing.T) {
 	}
 
 	// Check that the loaded path is set correctly
-	if cfg.LoadedPath != configPath {
-		t.Errorf("Expected LoadedPath to be '%s', got '%s'", configPath, cfg.LoadedPath)
+	if cfg.Path != configPath {
+		t.Errorf("Expected Path to be '%s', got '%s'", configPath, cfg.Path)
 	}
 
 	// Test Cloudflare config
-	if !cfg.IsRegistrarEnabled("cloudflare") {
-		t.Error("Cloudflare should be enabled")
-	}
-
-	cfConfig := cfg.GetCloudflareConfig()
+	cfConfig := cfg.Providers.Cloudflare
 	if cfConfig == nil {
 		t.Fatal("Cloudflare config should not be nil")
 	}
 
-	if cfConfig.APIKey != "test-cf-key" {
-		t.Errorf("Expected Cloudflare API key 'test-cf-key', got '%s'", cfConfig.APIKey)
+	if !cfConfig.Enabled {
+		t.Error("Cloudflare should be enabled")
 	}
 
-	if cfConfig.Email != "test@example.com" {
-		t.Errorf("Expected Cloudflare email 'test@example.com', got '%s'", cfConfig.Email)
+	if cfConfig.AccountId != "test-account-id" {
+		t.Errorf("Expected Cloudflare account id 'test-account-id', got '%s'", cfConfig.AccountId)
+	}
+
+	if cfConfig.APIToken != "test-cf-token" {
+		t.Errorf("Expected Cloudflare API token 'test-cf-token', got '%s'", cfConfig.APIToken)
 	}
 
 	// Test Namecheap config (should be configured but disabled)
-	if cfg.IsRegistrarEnabled("namecheap") {
-		t.Error("Namecheap should be disabled")
-	}
-
-	if !cfg.HasRegistrarConfig("namecheap") {
-		t.Error("Namecheap should be configured")
-	}
-
-	ncConfig := cfg.GetNamecheapConfig()
+	ncConfig := cfg.Providers.Namecheap
 	if ncConfig == nil {
 		t.Fatal("Namecheap config should not be nil")
+	}
+
+	if ncConfig.Enabled {
+		t.Error("Namecheap should be disabled")
 	}
 
 	if ncConfig.APIKey != "test-nc-key" {
@@ -95,14 +92,14 @@ func TestConfigIntegration(t *testing.T) {
 		t.Error("Namecheap sandbox should be true")
 	}
 
-	// Test enabled registrars
-	enabledRegistrars := cfg.GetEnabledRegistrars()
-	if len(enabledRegistrars) != 1 {
-		t.Errorf("Expected 1 enabled registrar, got %d", len(enabledRegistrars))
+	// Test enabled providers
+	enabledProviders := cfg.GetEnabledProviders()
+	if len(enabledProviders) != 1 {
+		t.Errorf("Expected 1 enabled provider, got %d", len(enabledProviders))
 	}
 
-	if len(enabledRegistrars) > 0 && enabledRegistrars[0] != "cloudflare" {
-		t.Errorf("Expected 'cloudflare' to be the only enabled registrar, got '%s'", enabledRegistrars[0])
+	if len(enabledProviders) > 0 && enabledProviders[0] != "cloudflare" {
+		t.Errorf("Expected 'cloudflare' to be the only enabled provider, got '%s'", enabledProviders[0])
 	}
 
 	// Test management config
@@ -163,7 +160,7 @@ func TestGetConfig(t *testing.T) {
 	}
 
 	// Test with valid config
-	testConfig := &config.Config{}
+	testConfig := &indietool.Config{}
 	appConfig = testConfig
 	cfg = GetConfig()
 	if cfg != testConfig {
@@ -173,33 +170,26 @@ func TestGetConfig(t *testing.T) {
 
 func TestInitConfigWithMissingFile(t *testing.T) {
 	// Store original values
-	originalConfigPath := configPath
 	originalAppConfig := appConfig
 	defer func() {
-		configPath = originalConfigPath
 		appConfig = originalAppConfig
 	}()
 
-	// Set configPath to a non-existent file
-	configPath = "/non/existent/config.yaml"
-	appConfig = nil
+	// Point the config at a non-existent file
+	appConfig = indietool.GetDefaultConfig()
+	appConfig.Path = "/non/existent/config.yaml"
 
-	// Call initConfig - this should not fatal, but create empty config
+	// Call initConfig - this should not fatal, but fall back to a default config
 	initConfig()
 
-	// Check that appConfig is not nil (empty config created)
+	// Check that appConfig is not nil (default config created)
 	if appConfig == nil {
 		t.Error("appConfig should not be nil after initConfig with missing file")
 	}
 
-	// Check that the config is not valid (no LoadedPath set)
-	if appConfig.Valid() {
-		t.Error("Config should not be valid when loaded from missing file")
-	}
-
-	// Check that LoadedPath is empty
-	if appConfig.LoadedPath != "" {
-		t.Errorf("Expected empty LoadedPath, got '%s'", appConfig.LoadedPath)
+	// The config must not claim to have been loaded from the missing file
+	if appConfig.Path == "/non/existent/config.yaml" {
+		t.Error("Config path should not point at the missing file after initConfig")
 	}
 }
 
@@ -215,11 +205,11 @@ func TestSaveConfigIfValid(t *testing.T) {
 	saveConfigIfValid() // Should not panic or do anything
 
 	// Test with invalid config
-	appConfig = &config.Config{} // No LoadedPath, so invalid
-	saveConfigIfValid()          // Should not save anything
+	appConfig = &indietool.Config{} // No Path, so invalid
+	saveConfigIfValid()             // Should not save anything
 
 	// Test with Viper config (should skip saving)
-	appConfig = &config.Config{LoadedPath: "<viper>"}
+	appConfig = &indietool.Config{Path: "<viper>"}
 	saveConfigIfValid() // Should skip saving
 
 	// Test with valid config and temporary file
@@ -237,7 +227,7 @@ func TestSaveConfigIfValid(t *testing.T) {
 	}
 
 	// Load the config
-	cfg, err := config.LoadConfigFromPath(testConfigPath)
+	cfg, err := indietool.LoadFromPath(testConfigPath)
 	if err != nil {
 		t.Fatalf("Failed to load test config: %v", err)
 	}
@@ -250,7 +240,7 @@ func TestSaveConfigIfValid(t *testing.T) {
 	saveConfigIfValid()
 
 	// Verify it was saved correctly by loading it again
-	reloadedCfg, err := config.LoadConfigFromPath(testConfigPath)
+	reloadedCfg, err := indietool.LoadFromPath(testConfigPath)
 	if err != nil {
 		t.Fatalf("Failed to reload saved config: %v", err)
 	}
@@ -266,5 +256,110 @@ func TestSaveConfigIfValid(t *testing.T) {
 		if i >= len(actualDays) || actualDays[i] != expected {
 			t.Errorf("Expected expiry warning day %d at index %d, got %d", expected, i, actualDays[i])
 		}
+	}
+}
+
+// newTestConfigFile creates a minimal config file and points appConfig at it.
+// Returns the config file path.
+func newTestConfigFile(t *testing.T) string {
+	t.Helper()
+
+	// Reset provider flag values so state from earlier test executions
+	// does not leak into this one.
+	cloudflareAPIToken = ""
+	cloudflareEmail = ""
+	cloudflareAccountID = ""
+	jsonOutput = false
+	verbose = false
+	domainRegisterYes = false
+	domainRegisterDryRun = false
+	domainsRenewOn = false
+	domainsRenewOff = false
+	domainSetAutoRenew = false
+	domainSetPrivacy = false
+	domainSetLocked = false
+	domainSetOn = false
+	domainSetOff = false
+
+	tempDir := t.TempDir()
+	testConfigPath := filepath.Join(tempDir, "config.yaml")
+
+	content := `domains:
+  management:
+    expiry_warning_days: [30, 7, 1]
+`
+	if err := os.WriteFile(testConfigPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	cfg, err := indietool.LoadFromPath(testConfigPath)
+	if err != nil {
+		t.Fatalf("Failed to load test config: %v", err)
+	}
+
+	appConfig = cfg
+	return testConfigPath
+}
+
+// TestConfigAddProviderCloudflarePersistsAccountID verifies that
+// `config add provider cloudflare --api-token X --account-id acc`
+// persists the account_id into the config file.
+func TestConfigAddProviderCloudflarePersistsAccountID(t *testing.T) {
+	originalAppConfig := appConfig
+	defer func() {
+		appConfig = originalAppConfig
+	}()
+
+	configPath := newTestConfigFile(t)
+
+	rootCmd.SetArgs([]string{
+		"config", "add", "provider", "cloudflare",
+		"--api-token", "test-token",
+		"--account-id", "acc-123",
+	})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config add provider cloudflare failed: %v", err)
+	}
+
+	reloaded, err := indietool.LoadFromPath(configPath)
+	if err != nil {
+		t.Fatalf("Failed to reload config: %v", err)
+	}
+
+	cf := reloaded.Providers.Cloudflare
+	if cf == nil {
+		t.Fatal("Cloudflare config should be persisted")
+	}
+	if cf.AccountId != "acc-123" {
+		t.Errorf("Expected account_id 'acc-123', got '%s'", cf.AccountId)
+	}
+	if cf.APIToken != "test-token" {
+		t.Errorf("Expected api_token 'test-token', got '%s'", cf.APIToken)
+	}
+	if !cf.Enabled {
+		t.Error("Cloudflare provider should be enabled")
+	}
+}
+
+// TestConfigAddProviderCloudflareRequiresAccountID verifies that omitting
+// --account-id returns a validation error.
+func TestConfigAddProviderCloudflareRequiresAccountID(t *testing.T) {
+	originalAppConfig := appConfig
+	defer func() {
+		appConfig = originalAppConfig
+	}()
+
+	newTestConfigFile(t)
+
+	rootCmd.SetArgs([]string{
+		"config", "add", "provider", "cloudflare",
+		"--api-token", "test-token",
+	})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("Expected an error when --account-id is missing")
+	}
+	if !strings.Contains(err.Error(), "account-id") {
+		t.Errorf("Expected error to mention account-id, got: %v", err)
 	}
 }

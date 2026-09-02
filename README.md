@@ -194,6 +194,57 @@ sideproject.ai      cloudflare  healthy  1y       Yes         1y    fred.ns.clou
 
 ---
 
+### 🛒 Buy & Manage Domains with Cloudflare Registrar (beta)
+
+**Problem:** Buying a domain means leaving the terminal, and renewal settings rot.
+**Solution:** `indietool` wraps the new Cloudflare Registrar API — real-time availability checks, guarded registration, and auto-renew management.
+
+Prerequisites on your Cloudflare account:
+
+1. **Account ID** — now required when configuring the provider (`--account-id`)
+2. API token with **Registrar write** permission
+3. A **default payment method** on the account
+4. A **default registrant contact** and the **Domain Registration Agreement** accepted (dashboard → Domains/Registrations)
+
+```bash
+# Configure Cloudflare with your account ID
+indietool config add provider cloudflare \
+  --account-id YOUR_ACCOUNT_ID \
+  --api-token YOUR_TOKEN
+
+# Real-time availability + price (beta API, up to 20 domains)
+indietool domain check myapp.dev
+indietool domain check myapp.com myapp.dev myapp.app --json
+
+# Register a domain (billable — shows the price and asks you to confirm)
+indietool domain register myapp.dev
+indietool domain register myapp.dev --yes       # skip the confirmation prompt
+indietool domain register myapp.dev --dry-run   # price check only, no purchase
+
+# Renewal info + auto-renew toggle (new Registrar API)
+indietool domains renew myapp.dev
+indietool domains renew myapp.dev --on
+indietool domains renew myapp.dev --off
+
+# Full details: expiry, status, auto-renew, lock, privacy mode
+indietool domain get myapp.dev
+
+# Toggle auto-renew
+indietool domain set myapp.dev --auto-renew --on
+# (privacy/lock are dashboard-only; see notes below)
+```
+
+Notes:
+
+- All commands in this section use the **new Cloudflare Registrar API** (`/registrar/domain-check`, `/registrar/registrations`, ...). The legacy `/registrar/domains` endpoints are deprecated by Cloudflare (end-of-life 2026-09-27) and are **not** used.
+- Only a subset of TLDs is supported by the API beta; renewals, transfers, and contact updates are not yet available through it.
+- Registration is **billable and non-refundable** — `indietool` always shows the price and requires confirmation unless `--yes` is given.
+- API registrations default to `auto_renew: off`; enable it with `indietool domains renew <domain> --on`.
+- Renewal pricing is not exposed by the API, and manual early renewal (paying to extend before expiry) is dashboard-only; the API manages auto-renewal only.
+- **Privacy & registrar lock are dashboard-only**: the API currently supports updating `auto_renew` only, so `domain set --privacy/--locked` fails fast with an error instead of silently doing nothing.
+
+---
+
 ### ☁️ Manage DNS Records Across Providers
 
 **Problem:** Managing DNS records across different providers is tedious and error-prone.
@@ -461,6 +512,9 @@ indietool dns set example.com www A 1.2.3.4 --dry-run --json
 **Notes:**
 
 - **Domains**: Domain registration management, expiry tracking, nameserver updates
+- **Cloudflare Registrar (beta)**: buy domains via API (`domain check` / `domain register`) and manage auto-renew (`domains renew`, `domain get`, `domain set`) through the new Registrar API; privacy/lock remain dashboard-only until the API supports them
+
+**Sandbox testing**: point the Cloudflare provider at the Registrar Sandbox API (test environment, no billing) with "indietool config add provider cloudflare --sandbox" (or "sandbox: true" in the provider config). The sandbox mirrors the production Registrar API under /registrar-sandbox/... and supports only com/net; purchases are free but persist. It requires an API token with Registrar Sandbox permissions and full contact data on register (no Express Mode).
 - **DNS**: DNS record management (list, create, update, delete) with ID-based targeting
 - **Secrets**: Local encrypted secret storage (OS keyring or age-ssh backend)
 

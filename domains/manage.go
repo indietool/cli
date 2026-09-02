@@ -45,6 +45,8 @@ type ManagedDomain struct {
 	Provider    string       `json:"provider"`
 	ExpiryDate  time.Time    `json:"expiry_date"`
 	AutoRenewal bool         `json:"auto_renewal"`
+	Locked      bool         `json:"locked"`
+	Privacy     bool         `json:"privacy"`
 	Nameservers []string     `json:"nameservers"`
 	Status      DomainStatus `json:"status"`
 	LastUpdated time.Time    `json:"last_updated"`
@@ -121,6 +123,29 @@ type Registrar interface {
 	// DNS Operations (basic)
 	GetNameservers(ctx context.Context, name string) ([]string, error)
 	UpdateNameservers(ctx context.Context, name string, nameservers []string) error
+}
+
+// DomainSettings holds the mutable registrar settings for a domain. Only
+// non-nil fields are applied, so callers can update a single setting without
+// touching the others.
+type DomainSettings struct {
+	AutoRenew *bool `json:"auto_renew,omitempty"`
+	Locked    *bool `json:"locked,omitempty"`
+	Privacy   *bool `json:"privacy,omitempty"`
+}
+
+// SettingsManager is an optional capability for registrars that can update
+// domain settings (auto-renew, registrar lock, WHOIS privacy) in a single
+// call. Use AsSettingsManager to type-assert a Registrar.
+type SettingsManager interface {
+	UpdateDomainSettings(ctx context.Context, name string, settings DomainSettings) error
+}
+
+// AsSettingsManager returns the SettingsManager capability of a Registrar if
+// it is supported.
+func AsSettingsManager(r Registrar) (SettingsManager, bool) {
+	m, ok := r.(SettingsManager)
+	return m, ok
 }
 
 type Manager struct {

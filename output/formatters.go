@@ -10,22 +10,35 @@ import (
 
 // Time formatters
 var (
-	// RelativeTimeFormatter formats time as relative duration (e.g., "2h", "3d")
+	// RelativeTimeFormatter formats time as relative duration (e.g., "2h", "3d").
+	// Zero times (unknown/unsynced) render as "N/A" instead of a nonsensical
+	// multi-century duration.
 	RelativeTimeFormatter = func(value interface{}) string {
 		if t, ok := value.(time.Time); ok {
+			if t.IsZero() {
+				return "N/A"
+			}
 			return formatRelativeTime(time.Since(t))
 		}
 		if s, ok := value.(string); ok {
 			if t, err := time.Parse(time.RFC3339, s); err == nil {
+				if t.IsZero() {
+					return "N/A"
+				}
 				return formatRelativeTime(time.Since(t))
 			}
 		}
 		return "N/A"
 	}
 
-	// ExpiryTimeFormatter formats time until expiry (e.g., "30d", "-5d" for expired)
+	// ExpiryTimeFormatter formats time until expiry (e.g., "30d", "-5d" for expired).
+	// Zero times (unknown expiry) render as "N/A" instead of a nonsensical
+	// duration.
 	ExpiryTimeFormatter = func(value interface{}) string {
 		if t, ok := value.(time.Time); ok {
+			if t.IsZero() {
+				return "N/A"
+			}
 			duration := time.Until(t)
 			if duration < 0 {
 				return fmt.Sprintf("-%s", formatRelativeTime(-duration))
@@ -34,6 +47,9 @@ var (
 		}
 		if s, ok := value.(string); ok {
 			if t, err := time.Parse(time.RFC3339, s); err == nil {
+				if t.IsZero() {
+					return "N/A"
+				}
 				duration := time.Until(t)
 				if duration < 0 {
 					return fmt.Sprintf("-%s", formatRelativeTime(-duration))

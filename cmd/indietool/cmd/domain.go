@@ -23,11 +23,13 @@ name across popular TLDs.
 Available subcommands:
   search   Check availability of specific domain names
   explore  Explore a domain name across multiple popular TLDs
+  check    Real-time availability + pricing via Cloudflare Registrar (beta)
 
 Examples:
   indietool domain search example.com
   indietool domain explore myapp
   indietool domain explore startup --tlds com,org,dev,ai
+  indietool domain check example.dev
 
 The domain command also shows your current configuration status including
 enabled registrars and configuration validation results.`,
