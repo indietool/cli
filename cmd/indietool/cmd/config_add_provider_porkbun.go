@@ -22,7 +22,12 @@ var configAddProviderPorkbunCmd = &cobra.Command{
 This command adds Porkbun API credentials to your configuration file,
 allowing indietool to manage domains and other services through Porkbun.
 
-You can obtain your API key and secret from your Porkbun account dashboard.`,
+You can obtain your API key and secret from your Porkbun account dashboard.
+
+Registrar functions (real-time availability checks, registration,
+auto-renewal) are supported through the Porkbun API v3. To test without
+real charges, pass sandbox API keys (prefix pk1_sb_ / sk1_sb_) - Porkbun's
+sandbox is a fully simulated account with fake credit on the same API.`,
 	Example: `  indietool config add provider porkbun --api-key YOUR_API_KEY --api-secret YOUR_API_SECRET`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate required flags

@@ -273,6 +273,17 @@ func newTestConfigFile(t *testing.T) string {
 	verbose = false
 	domainRegisterYes = false
 	domainRegisterDryRun = false
+	domainRegisterProvider = ""
+	domainCheckProvider = ""
+	domainRegisterContactName = ""
+	domainRegisterContactOrg = ""
+	domainRegisterContactEmail = ""
+	domainRegisterContactPhone = ""
+	domainRegisterContactStreet = ""
+	domainRegisterContactCity = ""
+	domainRegisterContactState = ""
+	domainRegisterContactPostal = ""
+	domainRegisterContactCountry = ""
 	domainsRenewOn = false
 	domainsRenewOff = false
 	domainSetAutoRenew = false

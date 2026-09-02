@@ -49,9 +49,9 @@ var domainsRenewCmd = &cobra.Command{
 	Long: `Show expiry and auto-renewal status for a domain, or toggle auto-renewal
 with --on / --off.
 
-Note: the Cloudflare Registrar API only manages auto-renewal. Renewal pricing
-is not exposed by the API, and manual early renewal (paying to extend a domain
-before it expires) is only available in the Cloudflare dashboard.
+Note: the Cloudflare Registrar API only manages auto-renewal (renewal pricing
+is not exposed, and manual early renewal is dashboard-only). Porkbun exposes
+renewal pricing through its API; manual early renewal is not wired yet.
 
 Examples:
   indietool domains renew example.dev
@@ -137,7 +137,11 @@ Examples:
 			fmt.Fprintln(out, "Renewal:     not available via the Registrar API (see the dashboard)")
 		}
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Note: the Cloudflare Registrar API only manages auto-renewal; renewal pricing and manual early renewal are dashboard-only.")
+		if dm.Provider == "cloudflare" {
+			fmt.Fprintln(out, "Note: the Cloudflare Registrar API only manages auto-renewal; renewal pricing and manual early renewal are dashboard-only.")
+		} else {
+			fmt.Fprintln(out, "Note: manual early renewal (paying to extend before expiry) is not wired for this provider yet.")
+		}
 		return nil
 	},
 }

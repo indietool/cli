@@ -24,11 +24,12 @@ var domainSetCmd = &cobra.Command{
 	Short: "Update domain settings (auto-renew; privacy/lock dashboard-only)",
 	Long: `Update mutable registrar settings for a domain.
 
-Currently only auto-renewal can be changed through the Cloudflare Registrar
-API (PATCH /registrar/registrations). Registrar lock and WHOIS privacy are
-not yet supported by the API: passing --privacy or --locked against
-Cloudflare fails fast with an error instead of calling the API. Manage those
-settings in the Cloudflare dashboard (Domains > Registrations).
+Currently only auto-renewal can be changed through the registrar APIs
+(Cloudflare and Porkbun). Registrar lock and WHOIS privacy are not supported
+by either API: passing --privacy or --locked fails fast with an error
+instead of calling the API. Manage those settings in the provider's
+dashboard (Cloudflare: Domains > Registrations; Porkbun: domain detail
+page).
 
 Examples:
   indietool domain set example.dev --auto-renew --on
@@ -104,8 +105,8 @@ func init() {
 	domainCmd.AddCommand(domainSetCmd)
 
 	domainSetCmd.Flags().BoolVar(&domainSetAutoRenew, "auto-renew", false, "Change the auto-renewal setting")
-	domainSetCmd.Flags().BoolVar(&domainSetPrivacy, "privacy", false, "Change the WHOIS privacy setting (not supported via the Cloudflare API; dashboard-only)")
-	domainSetCmd.Flags().BoolVar(&domainSetLocked, "locked", false, "Change the registrar lock setting (not supported via the Cloudflare API; dashboard-only)")
+	domainSetCmd.Flags().BoolVar(&domainSetPrivacy, "privacy", false, "Change the WHOIS privacy setting (not supported by the Cloudflare/Porkbun APIs; dashboard-only)")
+	domainSetCmd.Flags().BoolVar(&domainSetLocked, "locked", false, "Change the registrar lock setting (not supported by the Cloudflare/Porkbun APIs; dashboard-only)")
 	domainSetCmd.Flags().BoolVar(&domainSetOn, "on", false, "Enable the selected settings")
 	domainSetCmd.Flags().BoolVar(&domainSetOff, "off", false, "Disable the selected settings")
 }

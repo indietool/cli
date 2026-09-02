@@ -33,9 +33,12 @@ func (p *PorkbunConfig) SetEnabled(enabled bool) {
 
 // PorkbunProvider implements the Provider interface for Porkbun
 type PorkbunProvider struct {
-	client *porkbun.Client
-	config PorkbunConfig
+	client    *porkbun.Client
+	config    PorkbunConfig
+	registrar *PorkbunRegistrarClient
 }
+
+var _ domains.Purchaser = (*PorkbunProvider)(nil)
 
 // NewPorkbunProvider creates a new Porkbun provider instance
 func NewPorkbunProvider() *PorkbunProvider {
@@ -55,6 +58,7 @@ func NewPorkbun(config PorkbunConfig) *PorkbunProvider {
 			ApiKey:       pb.config.APIKey,
 			SecretApiKey: pb.config.APISecret,
 		})
+		pb.registrar = NewPorkbunRegistrarClient(pb.config.APIKey, pb.config.APISecret)
 	}
 
 	return pb
@@ -104,9 +108,136 @@ func (p *PorkbunProvider) Configure(config PorkbunConfig) error {
 			ApiKey:       p.config.APIKey,
 			SecretApiKey: p.config.APISecret,
 		})
+		p.registrar = NewPorkbunRegistrarClient(p.config.APIKey, p.config.APISecret)
 	}
 
 	return nil
+}
+
+// registrarClient lazily builds the Porkbun registrar (purchase) API client.
+func (p *PorkbunProvider) registrarClient() *PorkbunRegistrarClient {
+	if p.registrar == nil {
+		p.registrar = NewPorkbunRegistrarClient(p.config.APIKey, p.config.APISecret)
+	}
+	return p.registrar
+}
+
+// Check implements the domains.Purchaser capability using the Porkbun API
+// (real-time availability + pricing, one domain per request). Checks are
+// paced using the API-reported rate-limit window so multi-domain batches do
+// not trip the default 1-check-per-10-seconds account limit.
+func (p *PorkbunProvider) Check(ctx context.Context, names []string) ([]domains.Availability, error) {
+	if len(names) == 0 {
+		return nil, fmt.Errorf("provider/porkbun: no domain names provided")
+	}
+
+	client := p.registrarClient()
+	results := make([]domains.Availability, 0, len(names))
+	for i, name := range names {
+		res, err := client.CheckDomain(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, res.toAvailability(name))
+
+		// Pace between calls: ttlRemaining reports the seconds until the
+		// account's check rate-limit window resets. Capped so large batches
+		// stay sane; the API also answers 429 with Retry-After as backstop.
+		if i < len(names)-1 && res.TTLRemaining > 0 {
+			wait := time.Duration(res.TTLRemaining)*time.Second + porkbunPacingGrace
+			if wait > porkbunMaxPacingWait {
+				wait = porkbunMaxPacingWait
+			}
+			log.Debugf("provider/porkbun: pacing %s before next check (rate-limit window)", wait)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+	}
+
+	return results, nil
+}
+
+// Register implements the domains.Purchaser capability using the Porkbun API
+// (synchronous, billable). Porkbun registers domains with the account's
+// default registrant contact, so an explicit contact is refused up front.
+func (p *PorkbunProvider) Register(ctx context.Context, name string, contact *domains.RegistrantContact) (*domains.RegistrationResult, error) {
+	if contact != nil {
+		return nil, fmt.Errorf("provider/porkbun: --contact-* flags are not supported: Porkbun registers domains with the account's default registrant contact (manage it at porkbun.com/account)")
+	}
+
+	client := p.registrarClient()
+
+	// Re-check immediately before registering: the create call requires a
+	// cost that exactly matches the current price at the minimum duration.
+	check, err := client.CheckDomain(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(check.Response.Avail, "yes") {
+		return nil, fmt.Errorf("provider/porkbun: %s is not available for registration", name)
+	}
+	if strings.EqualFold(check.Response.Premium, "yes") {
+		return nil, fmt.Errorf("provider/porkbun: %s is a premium domain and cannot be registered via the Porkbun API", name)
+	}
+	cost, err := priceToPennies(check.Response.Price)
+	if err != nil {
+		return nil, fmt.Errorf("provider/porkbun: cannot determine registration cost for %s: %w", name, err)
+	}
+
+	resp, err := client.CreateDomain(ctx, name, cost, false)
+	if err != nil {
+		return nil, err
+	}
+
+	domainName := resp.Domain
+	if domainName == "" {
+		domainName = name
+	}
+	return &domains.RegistrationResult{
+		DomainName: domainName,
+		State:      domains.RegistrationStateSucceeded,
+		Completed:  true,
+	}, nil
+}
+
+// UpdateDomainSettings updates mutable registrar settings. The Porkbun API
+// supports auto-renewal only: WHOIS privacy and registrar lock have no API
+// endpoints, so requests touching them are rejected up front (before any
+// network call) instead of being sent to the API.
+func (p *PorkbunProvider) UpdateDomainSettings(ctx context.Context, name string, settings domains.DomainSettings) error {
+	if settings.Privacy != nil || settings.Locked != nil {
+		return fmt.Errorf("provider/porkbun: WHOIS privacy and registrar lock updates are not supported by the Porkbun API; manage them in the Porkbun dashboard")
+	}
+	if settings.AutoRenew == nil {
+		return fmt.Errorf("provider/porkbun: no settings to update for %s", name)
+	}
+
+	return p.registrarClient().UpdateAutoRenew(ctx, name, *settings.AutoRenew)
+}
+
+// RegistrationStatus implements the domains.Purchaser capability. Porkbun
+// registrations are synchronous, so a found domain reports succeeded; a 404
+// reports in_progress for callers polling after an async-style flow.
+func (p *PorkbunProvider) RegistrationStatus(ctx context.Context, name string) (*domains.RegistrationResult, error) {
+	dm, err := p.registrarClient().GetDomain(ctx, name)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return &domains.RegistrationResult{
+				DomainName: name,
+				State:      domains.RegistrationStateInProgress,
+				Completed:  false,
+			}, nil
+		}
+		return nil, err
+	}
+	return &domains.RegistrationResult{
+		DomainName: dm.Name,
+		State:      domains.RegistrationStateSucceeded,
+		Completed:  true,
+	}, nil
 }
 
 // ListDomains retrieves all domains from Porkbun
@@ -172,28 +303,16 @@ func (p *PorkbunProvider) convertPorkbunDomain(ctx context.Context, porkbunDomai
 	return managedDomain, nil
 }
 
-// GetDomain retrieves a specific domain from Porkbun
+// GetDomain retrieves a specific domain from Porkbun via the single-domain
+// endpoint (GET /domain/get/{domain}).
 func (p *PorkbunProvider) GetDomain(ctx context.Context, name string) (*domains.ManagedDomain, error) {
-	// Porkbun API doesn't have a single domain endpoint, so we list all and filter
-	domainList, err := p.ListDomains(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, domain := range domainList {
-		if domain.Name == name {
-			return &domain, nil
-		}
-	}
-
-	return nil, fmt.Errorf("domain %s not found", name)
+	return p.registrarClient().GetDomain(ctx, name)
 }
 
-// UpdateAutoRenewal updates the auto-renewal setting for a domain
+// UpdateAutoRenewal updates the auto-renewal setting for a domain via the
+// Porkbun API (POST /domain/updateAutoRenew/{domain}).
 func (p *PorkbunProvider) UpdateAutoRenewal(ctx context.Context, name string, enabled bool) error {
-	// TODO: Implement auto-renewal update via Porkbun API
-	// Note: Porkbun API doesn't currently provide an endpoint to update auto-renewal settings
-	return fmt.Errorf("auto-renewal update not supported by Porkbun API")
+	return p.registrarClient().UpdateAutoRenew(ctx, name, enabled)
 }
 
 // GetRenewalInfo retrieves renewal pricing information
