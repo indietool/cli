@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	domainRegisterYes    bool
-	domainRegisterDryRun bool
+	domainRegisterYes      bool
+	domainRegisterDryRun   bool
+	domainRegisterProvider string
 
 	domainRegisterContactName    string
 	domainRegisterContactOrg     string
@@ -157,31 +158,37 @@ func buildRegistrantContact() (*domains.RegistrantContact, error) {
 // domainRegisterCmd represents the domain register command
 var domainRegisterCmd = &cobra.Command{
 	Use:   "register <domain>",
-	Short: "Register a domain via Cloudflare Registrar (beta, billable)",
-	Long: `Register a domain through the Cloudflare Registrar purchase API (beta).
+	Short: "Register a domain via a purchase-capable registrar (billable)",
+	Long: `Register a domain through a purchase-capable registrar API.
 
 This is a billable, non-refundable operation. The current price is shown and
 must be confirmed (or acknowledged with --yes) before the registration is
 submitted.
 
-Prerequisites on the Cloudflare account:
-  - account ID configured (indietool config add provider cloudflare)
-  - API token with Registrar write permission
-  - a default payment method
-  - a default registrant contact and the Domain Registration Agreement accepted
-    (or pass the --contact-* flags explicitly)
+Providers (choose with --provider, or the first configured provider is used):
+  cloudflare  Cloudflare Registrar (beta). Registrations may complete
+              asynchronously; the command polls until terminal state.
+  porkbun     Porkbun API v3. Registration is synchronous and paid from
+              account credit: the account needs email+phone verified,
+              sufficient credit, and at least one prior registration
+              (Porkbun requirement). Premium domains cannot be registered
+              via the API. Use pk1_sb_/sk1_sb_ sandbox keys to test without
+              real charges (same base URL; fake credit).
 
-Registrant contact (--contact-* flags):
+Registrant contact (--contact-* flags, Cloudflare only):
   The Cloudflare Registrar Sandbox requires full registrant contact data on
   every registration; production Express-mode accounts do not. Pass all
   --contact-* flags together — --contact-country is ISO 3166-1 alpha-2 and
   --contact-phone uses the "+1.5555551234" format. Without contact flags the
-  account's default address book entry is used.
+  account's default address book entry is used. Porkbun does not accept
+  registrant contacts via the API: it registers with the account's default
+  contact, so --contact-* flags are refused for --provider porkbun.
 
 Examples:
   indietool domain register example.dev
   indietool domain register example.dev --yes
   indietool domain register example.dev --dry-run
+  indietool domain register example.com --provider porkbun --yes
   indietool domain register example.dev --yes \
     --contact-name "Jane Doe" --contact-email jane@example.com \
     --contact-phone "+1.5555551234" --contact-street "1 Main St" \
@@ -200,9 +207,15 @@ Examples:
 			return err
 		}
 
-		purchaser, err := getCloudflarePurchaser()
+		purchaser, err := getPurchaser(domainRegisterProvider)
 		if err != nil {
 			return err
+		}
+
+		// Porkbun registers with the account's default registrant contact;
+		// fail fast before showing prices instead of after confirmation.
+		if contact != nil && purchaserProviderName(purchaser) == "porkbun" {
+			return fmt.Errorf("--contact-* flags are not supported for Porkbun: registrations use the account's default registrant contact (manage it at porkbun.com/account)")
 		}
 
 		// Real-time availability + price immediately before registration.
@@ -272,7 +285,11 @@ Examples:
 
 		if !jsonOutput {
 			fmt.Fprintf(out, "Registration of %s succeeded.\n", name)
-			fmt.Fprintf(out, "Note: auto-renew defaults to off for API registrations; enable it with 'indietool domains renew %s --on'.\n", name)
+			if purchaserProviderName(purchaser) == "porkbun" {
+				fmt.Fprintf(out, "Manage auto-renew with 'indietool domains renew %s --on|--off'.\n", name)
+			} else {
+				fmt.Fprintf(out, "Note: auto-renew defaults to off for API registrations; enable it with 'indietool domains renew %s --on'.\n", name)
+			}
 		}
 		return nil
 	},
@@ -283,6 +300,7 @@ func init() {
 
 	domainRegisterCmd.Flags().BoolVar(&domainRegisterYes, "yes", false, "Skip the interactive price confirmation (billable)")
 	domainRegisterCmd.Flags().BoolVar(&domainRegisterDryRun, "dry-run", false, "Show availability and price without registering")
+	domainRegisterCmd.Flags().StringVar(&domainRegisterProvider, "provider", "", "Purchase provider: cloudflare or porkbun (default: first configured provider)")
 
 	domainRegisterCmd.Flags().StringVar(&domainRegisterContactName, "contact-name", "", "Registrant full name (required with any --contact-* flag)")
 	domainRegisterCmd.Flags().StringVar(&domainRegisterContactOrg, "contact-organization", "", "Registrant organization (optional)")

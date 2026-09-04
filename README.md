@@ -243,6 +243,38 @@ Notes:
 - Renewal pricing is not exposed by the API, and manual early renewal (paying to extend before expiry) is dashboard-only; the API manages auto-renewal only.
 - **Privacy & registrar lock are dashboard-only**: the API currently supports updating `auto_renew` only, so `domain set --privacy/--locked` fails fast with an error instead of silently doing nothing.
 
+#### 🥪 Same commands via Porkbun
+
+Porkbun's API v3 supports the same registrar flow, paid from your Porkbun account credit:
+
+```bash
+# Configure Porkbun (API key + secret from porkbun.com/account/api)
+indietool config add provider porkbun --api-key pk1_... --api-secret sk1_...
+
+# Real-time availability + price (one domain per request; paced to Porkbun's
+# check rate limit, default 1 per 10 seconds)
+indietool domain check myapp.com --provider porkbun
+
+# Register (billable, synchronous, charged to account credit)
+indietool domain register myapp.com --provider porkbun --yes
+
+# Renewal pricing + auto-renew toggle
+indietool domains renew myapp.com --provider porkbun
+indietool domains renew myapp.com --provider porkbun --on
+
+# Full details: expiry, status, auto-renew, lock, privacy
+indietool domain get myapp.com
+```
+
+Porkbun notes:
+
+- **Test for free with sandbox keys** — create `pk1_sb_`/`sk1_sb_` keys at porkbun.com/account/api and add them as the provider credentials: the sandbox is a fully simulated account with fake credit on the same API.
+- Registrations use the **account's default registrant contact**; the API takes no contact fields, so `--contact-*` flags are refused for `--provider porkbun`.
+- **Premium domains cannot be registered via the API** and are reported as not registrable by `domain check`.
+- The account must be email/phone verified, hold sufficient credit, and have placed at least one prior registration (Porkbun requirement).
+- WHOIS privacy and registrar lock have no API endpoints: `domain set --privacy/--locked` fails fast; manage them in the Porkbun dashboard.
+- Without `--provider`, the first configured purchase-capable provider (cloudflare, then porkbun) is used.
+
 ---
 
 ### ☁️ Manage DNS Records Across Providers
