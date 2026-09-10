@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+
 	"github.com/indietool/cli/indietool"
 	"github.com/indietool/cli/indietool/metrics"
 	"os"
@@ -71,6 +73,11 @@ func Execute() {
 	pendingItemsWG.Wait()
 
 	if err != nil {
+		// secret exec propagates the child's exit status verbatim.
+		var exitErr *exitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.code)
+		}
 		os.Exit(1)
 	}
 }
