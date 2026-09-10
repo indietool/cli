@@ -52,3 +52,18 @@ Config-only: recipe + security model into skill `references/hermes-dogfood.md`; 
 - `indietool secret exec -- sh -c 'env'` shows injected vars; count via grep ≥ 2; no value in argv (by construction; verified by printing argv inside the child).
 - `go build ./... && go vet ./...` clean; `go test ./cmd/... ./indietool/secrets/` green (pre-existing `TestSecretsDirectoryCalculation` excluded per acceptance).
 - Commit per task; push branch; open PR to `main` (repo convention: squash-merge).
+
+## Outcome (2026-09-10)
+
+- F1 shipped on this branch: `secret set --stdin/--trim` (bf0099a) + `secret exec` (bb408a1).
+  All acceptance gates verified live: byte-exact `echo -n` roundtrip, newline preserved by
+  default, values never in argv, injection count via env grep, exit-code + signal propagation,
+  `--json` report, collision refusal / `--force`.
+- F2 spike verdict: **config-only landing** — Hermes' real `CommandSource.fetch()` roundtrips
+  indietool exports exactly (incl. `#`/quote-containing values), 0.20s vs the 3s cap. No plugin.
+  Recipe recorded in the indietool-cli skill (`references/hermes-dogfood.md`); emitter added at
+  `scripts/hermes-secret-source/toenv.py`.
+- The legacy .env bridge scripts were never tracked by this repo — they live in the outer
+  project dir (`/home/projects/indietool/scripts/`) with hardcoded-path wrappers in
+  `/opt/data/bin/`. Decommissioning them (plus enabling `secrets: command:` in Hermes' config)
+  is host-side cutover, pending owner approval; until then no dual maintenance exists in-repo.
